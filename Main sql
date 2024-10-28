@@ -1,0 +1,115 @@
+Select top 10 * from [dbo].[CL_5min]
+
+
+Select * from [dbo].[CL_5min abs_adj] where [TradingDateTime]>='2023-06-06 09:30:00.0000000'
+
+drop table if exists #tmp1
+Select a.TradingDateTime ,
+	 cast(a.TradingDateTime as date) AS Dateonly,
+	 cast(a.TradingDateTime as TIME) as TimeOnly,
+	 convert(decimal(10,2),a.[Open]) as [Open],
+	 convert(decimal(10,2),a.[High]) as [High],
+	 convert(decimal(10,2),a.[Low]) as [Low],
+	 convert(decimal(10,2),a.[Close]) as [Close],
+	 a.Volume
+ into #tmp1 
+from [dbo].[CL_5min_IndividualCon] a
+where  [TradingDateTime]>='2023-05-31' and [TradingDateTime]<='2023-07-01'
+
+
+Select * from #tmp1 where  [TradingDateTime]>='2023-06-06' and [TradingDateTime]<='2023-06-07'  --277
+
+drop table if exists #tmp2
+Select b.* ,
+  case 
+	   when [Close]>=[Open] then 'Green Candle'
+	   else 'Red Candle' end as Candle_Color, 
+  case
+       when TimeOnly between '00:00' and '02:00' then 'ADR' 
+	   when TimeOnly between '02:05' and '02:55' then 'ADR-ODR' 
+   	   when TimeOnly between '03:00' and '08:30' then 'ODR' 
+       when TimeOnly between '08:35' and '09:25' then 'ODR-RDR' 
+	   when TimeOnly between '09:30' and '16:00' then 'RDR' 	
+	   when TimeOnly between '16:05' and '19:25' then 'RDR-ADR' 
+	   when TimeOnly between '19:30' and '23:55' then 'ADR' 	  
+	else 'notODR' end as session,
+   case    
+   	   when TimeOnly between '03:00' and '03:55' then 'ODR DR Box' 
+	   when TimeOnly between '09:30' and '10:25' then 'RDR DR Box'	
+	   when TimeOnly between '19:30' and '20:25' then 'ADR DR Box'  
+	else 'Other' end as DR_Box,
+  case   when TimeOnly between '19:30' and '23:55' then dateadd(day,1,Dateonly)
+	else Dateonly end as DR_date
+into #tmp2
+from #tmp1 b 
+
+
+drop table if exists #tmp3
+Select a.DR_Date,a.[Session] from #tmp2 a group by  a.DR_Date,a.[Session]
+
+
+Select a.DR_Date,a.[Session],b.[Open],c.[Close],d.[High] as DR_High, d.[Close] as IDR_High, e.[Low] as DR_Low, e.[Close] as IDR_Low  
+    into #tmp3
+	from #tmp2 a 
+left join
+	--DR open price
+	(Select DR_Date, TimeOnly,[session], [Open]  from #tmp2 where TimeOnly in ('19:30' ,'03:00','09:30'))b
+	on a.DR_Date=b.DR_Date and a.[Session]=b.[session]
+left join
+	--DR close price
+    (Select DR_Date, TimeOnly,[session], [Close]  from #tmp2 where TimeOnly in ('20:25' ,'03:55','10:25'))c
+on a.DR_Date=c.DR_Date and a.[Session]=c.[session]
+left join --DR High
+	(Select dd.* from 
+		(Select  DR_Date,Candle_Color, [session],DR_Box,TimeOnly, [Open],[Close],[High],[Low],
+		ROW_NUMBER() OVER (PARTITION BY DR_Date,DR_Box ORDER BY [High] DESC) as row_num
+		from #tmp2
+		where DR_Box not in ('Other') )dd
+		where  row_num = 1) d
+	on a.DR_Date=d.DR_Date and a.[Session]=d.[session]
+left join --DR Low
+	(Select ee.* 
+		from
+		  (Select  DR_Date,Candle_Color, [session],DR_Box,TimeOnly, [Open],[Close],[High],[Low],
+			ROW_NUMBER() OVER (PARTITION BY DR_Date,DR_Box ORDER BY [Low] Asc) as row_num
+			from #tmp2
+			where DR_Box not in ('Other') )ee
+			where  row_num = 1) e
+	on a.DR_Date=e.DR_Date and a.[Session]=e.[session]
+group by a.DR_Date,a.[Session],b.[Open],c.[Close],d.[High], d.[Close],e.[Low],e.[Close] 
+order by DR_Date asc
+
+
+Select * from #tmp3 order by DR_Date desc
+
+--tick size
+Select a.*,
+  convert (decimal(10,2),(a.IDR_High - a.IDR_Low)/10) as SD_size, 
+  convert (decimal(10,2),(a.IDR_High - a.IDR_Low)*10) as SD_tick_size 
+  
+  from #tmp3 a
+
+
+
+--DR high
+Select d.* , [High] as DR_High, [Close] as IDR_High
+	--case when Candle_Color='Red Candle' then [Close] 
+	--     when Candle_Color='Green Candle' then [Open] end as IDR_High
+from
+  (Select  DR_Date,Candle_Color, DR_Box,TimeOnly, [Open],[Close],[High],[Low],
+    ROW_NUMBER() OVER (PARTITION BY DR_Date,DR_Box ORDER BY [High] DESC) as row_num
+	from #tmp2
+	where DR_Box not in ('Other') )d
+	where  row_num = 1
+
+--DR Low
+Select e.* , [Low] as DR_Low, [Close] as IDR_Low from
+	  (Select  DR_Date,Candle_Color, DR_Box,TimeOnly, [Open],[Close],[High],[Low],
+		ROW_NUMBER() OVER (PARTITION BY DR_Date,DR_Box ORDER BY [Low] Asc) as row_num
+		from #tmp2
+		where DR_Box not in ('Other') )e
+		where  row_num = 1
+	--max([High]) as DR_High from #tmp2  where DR_Box not in ('Other') group by DR_Date,TimeOnly,DR_Box order by DR_Date
+
+
+
