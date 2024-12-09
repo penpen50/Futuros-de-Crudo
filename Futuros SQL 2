@@ -1,7 +1,6 @@
- 
 
 
-20:30/************************/
+/************************/
 --For RBC
 --It will be base on box color
 
@@ -61,4 +60,119 @@ Select a.*,
 	case when [Low]<=([IDR_Low]-(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
 from #tmp7 a
 where [Session] in ('ADR','ODR','RDR') and DR_Box='Other' and [Box Color] in ('Red') and [M7Box_Color_Close_SD]<-0.8
+
+Select top 10 * from #tmp8
+drop table if exists #tmp9
+Select a.DR_date,a.[Session],a.[Conf_Direction],a.[Box Color],
+	a.FirstEntryTime,
+	b.Stop_Out_Time
+into #tmp9
+from 
+	(Select DR_Date,[Session],Conf_Direction,[Box Color]'
+		cast(min(TradingDateTime) as Time) as FirstEntryTime
+		from #tmp8
+	where [Qualify_Entry_Time]=1
+	group by DR_Date,[Session],[Conf_Direction,[Box Color]) a
+left join
+	(Select DR_date,[Session],
+		cast(min(TradingDateTime) as Time) as [Stop_Out_Time]
+	from #tmp8
+where [SL_Hit]=1 group by DR_date,[Session])b
+on a.DR_date=b.DR_date and a.[Session]=b.[Session]
+
+
+Select * from #tmp9
+drop table if exists #FirstEntry
+
+Select DR_date,[Session],[Conf_Direction],[Box Color],
+	cast(min(TradingDateTime) as Time) as FirstEntryTime
+	into #FirstEntry
+from #tmp8
+where [Qualify_Entry_Time]=1
+group by DR_date,[Session],Conf_Direction,[Box Color]
+
+drop table if exists #TPreach
+
+Select c.DR_date,c.[Session],
+	cast(min(TradingDateTime) as Time) as [TP_Reach_Time]
+into #TPreach
+from #tmp8c
+	join #FirstEntry fe on c.DR_date=fe.DR_Date and c.[Session]=fe.[Session]--inner join
+where [TP_hit]=1 and c.[Timeonly]>=fe.FirstEntryTime group by c.DR_date,c.[Session]
+
+drop table if exists #tmp10
+Select a.*,
+		   b.[TP_Reach_Time]
+			 into #tmp10
+		   from #tmp9 a
+left join
+			 #TPreach b
+on a.DR_date=b.DR_date and a.[session]=b.[session]
+
+Select * from #tmp10
+
+--Include also dates with no entry
+
+drop table if exists #tmp11
+
+Select DR_date,[session],Conf_Direction, cast(null as Time) as FirstEntryTime	
+	into #tmp11
+from #tmp8
+group by DR_date,[session],Conf_Direction
+having sum (Qualify_Entry_Time)=0
+
+drop table if exists #tmp12
+Select a.*,b.Stop_Out_Time,c.[TP_Reach_Time]
+	into #tmp12
+	from #tmp11 a
+left join
+	(Select DR_date,[session],Conf_Direction,
+			cast(min(TradingDateTime) as Time) as [Stop_Out_Time]
+from #tmp8
+	where [SL_hit]=1 group by DR_date,[session],[Conf_Direction])b
+on a.DR_date=b.DR_date and a.[session]=b.[session]
+left join
+	(Select DR_date,[Session],
+			cast(min(TradingDateTime) as Time) as [TP_Reach_Time]
+from #tmp8
+	where [TP_hit]=1 group by DR_date,[session])c
+on a.DR_date=c.DR_date and a.[session]=c.[session]
+
+--Combine dates with and without entry
+
+drop table if exists #Result
+
+Select * into #Result
+	from #tmp10
+union all
+Select * from #tmp12
+
+Select * from #tmp12
+Select * from #Result
+
+--Determine if the entry is a success or failure
+drop table if exists #tmp13
+
+Select a.*,
+	case when FirstEntrytime is null then 'NoEntry'
+		   when FirstEntrytime is null and Stop_Out_Time is null and TP_Reach_Time is null then 'Exit'--TP not reach but also did not hit the SL
+			 when FirstEntrytime is not null and Stop_Out_Time is not null and TP_Reach_Time is null then 'Fail'
+			 when FirstEntryTime is not null and Stop_Out_Time is null and TP_Reach_Time is not null then 'Success'
+			 when FirstEntryTime is not null and Stop_Out_Time is not null and TP_Reach_Time is not null and 			TP_Reach_Time<Stop_Out_Time then 'Success'--TPreach before any SL
+			 when FirstEntryTime is not null and Stop_Out_Time is not null and TP_Reach_Time is not null and 			TP_Reach_Time>=Stop_Out_Time then 'Fail'
+	end as [Outcome]
+into #tmp13
+from #Result a
+order by DR_date desc
+
+Select * from #tmp13
+Select * from #tmp8 order by TradingDateTime 
+
+--Join
+
+
+
+
+
+
 
