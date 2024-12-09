@@ -1,0 +1,35 @@
+ 
+
+
+20:30/************************/
+--For RBC
+--It will be base on box color
+
+Select top 100 * from #tmp7
+drop table if exists #tmp8
+
+--Declare @SD_Entry decimal(4,2);
+Declare @SD_Target decimal(4,2);
+Declare @SD_SL decimal(4,2);
+Declare @plus_tick decimal(4,2);
+
+set @SD_Target=1.0;
+set @SD_SL=-0.9;
+set @plus_tick=3;
+--set @SD_Entry=(Select[SessionClose] from #tmp7);
+
+--Entry must be in the body of the session
+--Entry must be before confirmation, otherwise no entry
+
+Select a.*,
+	[SessionClose] as [Entry],
+	case when Timeonly in ('20:30:00','04:00:00','10:30:00') then 1 else 0 end as [Qualify_Entry_Time],
+	[IDR_High]+(@SD_SL*10*[SD_Size])-(0.01*@plus_tick) as [SL],
+	case when [Low] <=([IDR_high]+(@SD_SL*10*[SD_Size])-(0.01*@plus_tick)) then 1 else 0 end as [SL_hit],
+	[IDR_high]+(@SD_Target*10*SD_Size) as [TP],
+	case when [High]>=([IDR_high]+(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
+into #tmp8
+from #tmp7 a
+	where [Session] in ('ADR','ODR','RDR') and DR_Box='Other' and [Box Color] in ('Green') and [M7Box_Color_Close_SD]>=-0.8
+union all 
+
