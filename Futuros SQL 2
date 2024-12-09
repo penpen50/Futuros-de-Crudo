@@ -1,4 +1,4 @@
-
+ 
 
 /************************/
 --For RBC
@@ -168,7 +168,101 @@ order by DR_date desc
 Select * from #tmp13
 Select * from #tmp8 order by TradingDateTime 
 
---Join
+--Join with entry,SL and TP
+drop table if exists #tmp14
+Select a.*, b.[Entry],b.[SL],b.[TP],b.[SessionClosePrice]
+	into #tmp14
+	from #tmp13 a
+left join
+	(Select DR_date,[Session],[Entry],SL,TP,[Close] as [SessionClosePrice]
+		from #tmp8
+where Timeonly in ('01:55:00','08:25:00','15:55:00')
+group by DR_date,[session],[Entry],SL,TP,[Close])b
+on a.DR_date=b.DR_date
+and a.[session]=b.[session]
+
+Select * from #tmp14
+
+--Calculate R
+drop table if exists #tmp15
+
+Select *,
+	case when [Outcome]='No Entry' then 0
+		   when [Outcome]='Fail' then abs(Entry-SL)*-1
+			 when [Outcome]='Success' then abs(Entry-TP)
+		   when [Outcome]='Exit' and Conf_Direction='Long' then (SessionClosePrice-[Entry])
+			 when [Outcome]='Exit' and Conf_Direction='Short' then ([Entry]-SessionClosePrice)
+		end as [PL],
+	convert(decimal(10,2),abs(([Entry]-TP)/([Entry]-SL))) as PotentialRR
+into #tmp15
+from #tmp14
+
+--determine R achieved
+
+Select * from #tmp15
+drop table if exists #tmp16
+Select a.*,
+	convert(decimal(10,2),case when [Outcome]='No Entry' then 0
+														 when [Outcome]='Fail' then -1
+                             when [Outcome]='Success' then PotentialRR
+       											 when [Outcome]='Exit' then (PL)/abs([Entry]-SL)
+	end) as [RR])
+into #tmp16
+from #tmp15 a
+
+Select * from #tmp16
+
+/**/
+/*Figure out original dataset by SD*/
+/*use #tmp7*/
+
+Select 
+	TradingDateTime,
+	Dateonly.
+	Timeonly,
+	[Session],
+	DR_Box,
+	DR_date,
+	[Open],
+	[High],
+	[Low],
+	[Close],
+	--SD assume long direction. for short, just use 1-
+	convert(decimal(10,2),([Open]-[IDR_high])/SD_Size) as [Candle_Open_SD],
+	convert(decimal(10,2),([High]-[IDR_high])/SD_Size) as [Candle_High_SD],  
+  convert(decimal(10,2),([Low]-[IDR_high])/SD_Size) as [Candle_Low_SD],                                  
+	convert(decimal(10,2,([Close]-[IDR_high])/SD_Size) as [Candle_Close_SD], 
+	Volume,
+	[Candle_Color],
+	FirstConfDateTime,
+	First_Conf_Time,
+	Conf_Direction,
+	[TF Day],
+	[False Time],
+	[Box Color],
+	SessionOpen,
+	SessionClose,
+	DR_high,
+	IDR_high,
+	DR_Low,
+	IDR_Low,
+	SD_Size,
+	SD_tick_Size,
+	SD0,	
+	DR_High_SD,
+	DR_Low_SD,
+	M7Box_Open_SD,	
+	M7Box_Close_SD, 
+	BoxSD0,
+	M7Box_Color_Close_SD, 
+	Raw_OpenSD,
+	Raw_CloseSD,
+	[SD-05]
+into #SDPlot
+from #tmp7
+ 
+
+
 
 
 
