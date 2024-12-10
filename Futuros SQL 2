@@ -1,6 +1,4 @@
- 
-
-/************************/
+ /************************/
 --For RBC
 --It will be base on box color
 
@@ -260,6 +258,40 @@ Select
 	[SD-05]
 into #SDPlot
 from #tmp7
+
+Select *,floor(Candle_CloseSD*10)/10 as round_down_close from #SDPlot where [Session]='RDR' and [Box Color]='Green' and DR_Box='Other' order by TradingDateTime desc
+
+Select * into #SDPlotsub from #SDPlot where [Session]='RDR' and [Box Color]='Green' and DR_Box='Other' order by TradingDateTime desc
+
+Select Timeonly,
+	Candle_Close_SD,
+	row_number() over (Partition by Timeonly order by Candle_Close_SD) as row_num,
+	count(*) over (Partition by Timeonly) as total_count
+into #CTE
+from #SDPlotsub
+
+--80 percentile
+Select Timeonly,	
+	min(Candle_Close_SD) as percentile_80_price
+into #80_percentile
+from #CTE
+where row_num>=0.8*total_count
+group by Timeonly
+order by Timeonly
+
+--20 percentile
+drop table if exists #20_percentile
+Select Timeonly,
+	min(Candle_Close_SD) as percentile_20_price
+into #20_percentile
+from #CTE
+where row_num>=0.2*total_cont
+group by Timeonly
+order by Timeonly
+
+                                  
+
+
  
 
 
