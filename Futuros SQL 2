@@ -289,6 +289,63 @@ where row_num>=0.2*total_cont
 group by Timeonly
 order by Timeonly
 
+Select * from #20_percenile
+
+--Mode
+Select Timeonly,
+	Candle_Close_SD as mode_price
+into #Mode
+From (
+	Select
+			Timeonly,
+			Candle_Close_SD,
+	  count(*) as count,
+	  row_number() over (partition by Timeonly order by count(*) desc) as rn
+	from #SDPlotsub
+group by Timeonly, Candle_Close_SD) subquery
+where rn=1
+order by Timeonly;
+
+--Median
+Select 
+	Timeonly,
+	avg(Candle_Close_SD) as median_SD
+into #MedianSD
+from #CTE
+where row_num in (
+	 (total_count+1)/2,
+  (total_count+2)/2
+)
+group by Timeonly
+order by Timeonly;
+
+--Average
+Select 
+	Timeonly,	
+	Avg(Candle_Close_SD) as average_SD
+into #AverageSD
+from #SDPlotsub
+group by Timeonly
+order by Timeonly
+
+--Join into 1 table
+Select a.
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
                                   
 
 
