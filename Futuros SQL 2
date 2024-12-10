@@ -329,7 +329,65 @@ group by Timeonly
 order by Timeonly
 
 --Join into 1 table
-Select a.
+Select a.*,b.median_SD,c.mode_price,d.percentile_20_price,e.percentile80_price
+from #AverageSD a
+left join #MedianSD b
+on a.Timeonly=b.Timeonly
+left join #Mode c
+on a.Timeonly=c.Timeonly
+left join #20_percentile d
+on a.Timeonly=d.Timeonly
+left join #80_percentile e
+on a.Timeonly=e.Timeonly
+
+
+/*************/
+/*BrokenTime*/
+/************/
+
+drop table if exists #Mid01
+Select DR_date,[Session],[SD-05]
+	into #Mid01
+from #tmp7
+where [session] in ('ADR','ODR','RDR')
+group by DR_date,[session],[SD-05]
+
+Select DR_Date,
+	max(case when [session]='ADR' then [SD-05] else null end) as ADR_Mid,
+ max(case when [session]='ODR' then [SD-05] else null end) as ODR_Mid,
+ max(case when [session]='RDR' then [SD-05] else null end) as RDR_Mid
+into #Mid02
+from #Mid01
+group by DR_date
+
+--Join original dataset and normalize candle open and close as 1 direction range base on value
+
+drop table if exists #Mid03
+Select a.*,b.ADR_Mid,b.ODR_Mid,b.RDR_Mid,
+	case when a.Candle_Color = 'Red Candle' then a.[Open] else a.[Close] end as CandleCloseH,
+	case when a.Candle_Color = 'Red Candle' then a.[Close] else a.[Open] end as CandleCloseL,
+into #Mid03 
+from #tmp7 a
+left join #Mid02 b
+on a.DR_Date=b.DR_Date
+
+--Find crossover time
+Drop table if exists #Broken01
+With ADRBrokenTimes as (
+	Select
+		DR_date,
+		TradingDateTime,
+		Timeonly,
+		[session],
+		DR_Box,
+		row_number() over (partition by DR_date order by TradingDateTime) as row_num
+from #Mid03
+where (Timeonly between '02:00:00' and '18:00:00') and (ADR_Mid between [Low] and [High]
+), 
+
+
+
+ 
 
 
 
