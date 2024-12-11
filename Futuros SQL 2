@@ -401,9 +401,36 @@ ODRBrokenTimes as(
 		Timeonly,
 		[session],
 		DR_Box,
-		row_number() over(partition by DR_date order by TradingDateTime) as row_numfrom #Mid03
-where (Timeonly between '08:30:00' and '18:00:00')
-	
+		row_number() over(partition by DR_date order by TradingDateTime) as row_num
+from #Mid03
+where (Timeonly between '08:30:00' and '18:00:00') and (ODR_Mid between [Low] and [High])
+		--(ODR_Mid between CandleCloseL and CandleCloseH)
+),
+FirstODRBrokenTime as (
+	Select 
+		DR_date,
+		TradingDateTime,
+		Timeonly as ODR_Broken,
+		[session] as ODR_Broken_session,
+		DR_Box as ODR_Broken_Box
+from ODRBrokenTimes 
+where row_num=1)
+
+Select a.DR_date,a.ADR_Broken, a.ADR_Broken_session,a.ADR_Broken_Box,
+		b.ODR_Broken, b.ODR_Broken_session,b.ODR_Broken_Box
+	into #DailyInfo01
+from #tmp6 a
+left join #Broken01 b
+on a.DR_date=b.DR_date
+
+Select * from #DAilyInfo01 order by DR_dae desc
+
+
+/*****************/
+
+/********Model*******/
+
+
 
 
 
