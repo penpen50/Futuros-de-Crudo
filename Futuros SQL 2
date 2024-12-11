@@ -1,4 +1,4 @@
- /************************/
+/************************/
 --For RBC
 --It will be base on box color
 
@@ -384,6 +384,28 @@ With ADRBrokenTimes as (
 from #Mid03
 where (Timeonly between '02:00:00' and '18:00:00') and (ADR_Mid between [Low] and [High]
 ), 
+FirstADRBrokenTime as (
+	Select 
+		DR_date,
+		TradingDateTime,
+		Timeonly as ADR_Broken,
+		[session] as ADR_Broken_session,
+		DR_Box as ADR_Broken_Box
+from ADRBrokenTimes 
+where row_num=1),
+
+ODRBrokenTimes as(
+	Select
+		DR_date,
+		TradingDateTime,
+		Timeonly,
+		[session],
+		DR_Box,
+		row_number() over(partition by DR_date order by TradingDateTime) as row_numfrom #Mid03
+where (Timeonly between '08:30:00' and '18:00:00')
+	
+
+
 
 
 
