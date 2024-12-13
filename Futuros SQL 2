@@ -426,9 +426,108 @@ on a.DR_date=b.DR_date
 Select * from #DAilyInfo01 order by DR_dae desc
 
 
-/*****************/
-
+/********************/
 /********Model*******/
+
+drop table if exists #Model01
+Select DR_date, datename(weekday,DR_date) as day_of_week,
+	case when datename(weekday,DR_date)='Monday' then dateadd(day,-3,DR_date)
+ 		else dateadd(day,-1,DR_date) end as Dummydate,
+	[Session],DR_High,DR_Low,IDR_High,IDR_Low,[SD-05]
+into #Model01
+from #DailyInfo01
+
+Select top 100 * from #Model01 order by DR_Date 
+drop table if exists #Model02
+Select DR_Date,datename(weekday,DR_date) as day_of_week,
+		max(case when [session]='ADR' then [SD-05] else NULL end) as ADR_Mid,
+  max(case when [session]='ODR' then [SD-05] else NULL end) as ODR_Mid,
+		max(case when [session]='RDR' then [SD-05] else NULL end) as RDR_Mid
+into #Model02
+from #Model01
+group by DR_date
+
+Select * from #Model02
+
+--Add mid point critical to deciding model type. i.e if ODR, use ADR as determining point
+--If weekday is Monday, then use Friday midpoint
+
+drop table if exists #Model03
+Select a.DR_date, a.day_of_week, a.Dummydate,[Session],a.DR_High,a.DR_Low, 
+	a.IDR_High, a.IDR_Low, a.[SD-05],
+	b.ADR_Mid,b.ODR_Mid,b.RDR_Mid,
+	c.RDR_Mid as RDR_Mid_Previous_Day,
+	case when a.[session]='ADR' then c.RDR_Mid
+	     when a.[session]='ODR' then b.ADR_Mid
+			   when a.[session]='RDR' then b.ODR_Mid
+	end as [Critical_Mid], 
+
+	case when a.[session]='ADR' then f.DR_High
+	     when a.[session]='ODR' then d.DR_High
+			   when a.[session]='RDR' then e.DR_High
+	end as [Critical_DR_High],
+
+	case when a.[session]='ADR' then f.DR_Low
+	     when a.[session]='ODR' then d.DR_Low
+			   when a.[session]='RDR' then e.DR_Low
+	end as [Critical_DR_Low],
+	
+case when a.[session]='ADR' then f.IDR_High
+	     when a.[session]='ODR' then d.IDR_High
+			   when a.[session]='RDR' then e.IDR_High
+	end as [Critical_IDR_High],
+
+case when a.[session]='ADR' then f.IDR_Low
+	     when a.[session]='ODR' then d.IDR_Low
+			   when a.[session]='RDR' then e.IDR_Low
+	end as [Critical_IDR_Low]
+
+into #Model03
+from #Model01 a
+left join #Model02b
+on a.DR_Date=b.DR_Date
+left join
+	(Select DR_date,RDR_Mid from #Model02) c
+on a.Dummydate=c.DRdate
+left join
+	(Select DR_date,DR_High,DR_Low,IDR_High,IDR_Low,[SD-05] from #Model01 
+			where [Session]='ADR')d
+	on a.DR_date=d.DR_date
+(Select DR_date,DR_High,DR_Low,IDR_High,IDR_Low,[SD-05] from #Model01 
+			where [Session]='ODR')e
+	on a.DR_date=e.DR_date
+(Select DR_date,DR_High,DR_Low,IDR_High,IDR_Low,[SD-05] from #Model01 
+			where [Session]='RDR')f   --from RDR to ADR model, we need to use previous day RDR
+	on a.Dummydate=f.DR_date
+
+Select * from #Model03 order by DR_Date,[Session]
+
+--Determine the different model
+drop table if exists #Model04
+Select a.*,
+	case when [IDR_High]<=[Critical_IDR_Low] then 'DXP'
+						 when [IDR_High]<=[Critical_Mid] and [IDR_High]>[Critical_IDR_Low] then 'DX'
+							when [IDR_Low]>=[Critical_IDR_High] then 'UXP'
+						 when [IDR_Low]>=[Critical_Mid] and [IDR_Low]<[Critical_IDR_High] then 'UX'
+							when [IDR_High]>[Critical_IDR_High] and [IDR_Low]<[Critical_IDR_Low] then 'RX'
+							when [IDR_High]>=[Critical_IDR_High] and [IDR_Low]>[Critical_IDR_Low]
+													and [IDR_Low]<[Critical_Mid] then 'U'
+							when [IDR_Low]<=[Critical_IDR_Low] and [IDR_High]<[Critical_IDR_High]
+													and [IDR_High]>[Critical_Mid] then 'D'
+							when [IDR_High]<=[Critical_IDR_High] and [IDR_Low]>=[Critical_IDR_Low] then 'RC'
+else 'NoModel' end as Model
+into #Model04
+from #Model03 a
+
+Select * from #Model04 order by DR_Date,[Session]
+
+Select a.*,b.Model
+	from #DailyInfo01 a
+left join #Model04 b
+on a.[DR_Date]=b.[DR_Date] and a.[Session]=b.[Session] 
+ 
+
+
 
 
 
