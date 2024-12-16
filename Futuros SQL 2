@@ -1,3 +1,472 @@
+Select top 10 * from  [dbo].[CL_5min_IndividualCon]
+drop table if exists #tmp1
+Select a.[TradingDateTime],
+cast (a.TradingDateTime as date) as Dateonly,
+cast(a.TradingDateTime as Time) as Timeonly,
+convert(decimal(10,2),[Open]) as [Open],
+convert(decimal(10,2),[High]) as [High],
+convert(decimal(10,2),[Low]) as [Low],
+convert(decimal(10,2),[Close]) as [Close],
+[Volume]
+into #tmp1
+from  [dbo].[CL_5min_IndividualCon]  a
+
+
+
+
+Select * from [dbo].[CL_5min_IndividualCon]  order by TradingDateTime desc
+
+drop table if exists #tmp2
+Select b.*,
+	case when b.[Close]>b.[Open] then 'Green Candle' else 'Red Candle' end as Candle_Color,
+	case when TimeOnly between '00:00' and '02:00' then 'ADR'
+		 when TimeOnly between '02:05' and '02:55' then 'ADR-ODR'
+		 when TimeOnly between '03:00' and '08:30' then 'ODR'
+		 when TimeOnly between '08:35' and '09:25' then 'ODR-RDR'
+	     when TimeOnly between '09:30' and '16:00' then 'RDR'
+		 when TimeOnly between '16:05' and '19:25' then 'RDR-ADR'
+		 when TimeOnly between '19:30' and '23:55' then 'ADR'
+else 'Something wrong' end as session,
+    case when TimeOnly between '03:00' and '03:55' then 'ODR DR Box'
+		 when TimeOnly between '09:30' and '10:25' then 'RDR DR Box'
+         when TimeOnly between '19:30' and '20:25' then 'ADR DR Box'
+		 else 'Other' end as [DR_Box],
+	case when TimeOnly between '19:30' and '23:55' then dateadd(day,1,Dateonly)
+		 else DateOnly end as [DR_date]
+into #tmp2
+from #tmp1 b
+
+
+Select top 10 * from #tmp2
+
+
+drop table if exists #tmp3
+--Select a.DR_Date,a. [Session] from #tmp2 a group by a.DR_Date,a. [Session] order by a.DR_Date
+Select a.DR_Date, a.[Session], b.[Open], c.[Close], dd.DR_High, ee.IDR_High, dd.DR_Low, ee.IDR_Low
+	into #tmp3
+	from #tmp2 a
+left join
+--DR open price
+	(Select DR_Date, TimeOnly, [Session], [Open]
+		from #tmp2 where TimeOnly in ('19:30', '03:00', '09:30')) b
+	on a.DR_Date=b.DR_Date and a. [Session]=b. [Session]
+--DR close price
+left join
+	(Select DR_Date, TimeOnly, [Session], [Close]
+		from #tmp2 where TimeOnly in ('20:25', '03:55','10:25')) c
+	on a.DR_Date=c.DR_Date and a.[Session]=c. [Session]
+left join
+--DR is highest high and lowest Low
+
+	(Select d.DR_Date, d.[Session], max(d.[HighLow]) as DR_high, min (d.[HighLow]) as DR_Low from
+		(Select DR_Date, [Session], [High] as [HighLow] from #tmp2 where DR_Box not in ('Other') 
+		 union all
+	     Select DR_Date, [Session], [Low] as [HighLow] from #tmp2 where DR_Box not in ('Other')) d 
+	 group by d.DR_Date, d. [Session]) dd
+	 on a.DR_Date=dd.DR_Date and a. [Session]=dd. [Session]
+left join
+--IDR high and IDR low is the highest and lowest of Open and Close
+	(Select e.DR_Date, e.[Session], max(e.[Close]) as IDR_high, min (e.[Close]) as IDR_Low
+		from #tmp2 e where DR_box not in ('Other')group by e.DR_Date, e.[Session])ee
+	--(Select e.DR_Date, e.[Session], max(e.[OpenClose]) as IDR_high, min (e.[OpenClose]) as IDR_Low from
+	--	(Select DR_Date, [Session], [Open] as [OpenClose] from #tmp2 where DR_Box not in ('Other')
+	--	 union all
+	-- Select DR_Date, [Session], [Close] as [OpenClose] from #tmp2 where DR_Box not in ('Other'))e
+ --    group by e.DR_Date, e.[Session]) ee
+on a.DR_Date=ee.DR_Date and a. [Session]=ee. [Session]
+where a.[Session] in ('ADR', 'ODR', 'RDR')
+group by a.DR_Date, a. [Session], b. [open], c. [Close], dd.DR_High, ee.IDR_High, dd.DR_Low, ee.IDR_Low
+
+Select * from #tmp3 where DR_Date>='2024-11-01' order by DR_Date desc
+
+
+--	(Select DR_Date, Candle_Color, [Session], DR_Box, TimeOnly, [Open], [Close], [High], [Low],
+--		row_number() over (partition by DR_Date, DR_Box order by [Low] asc) as row_num
+--		from #tmp2
+--	where DR_Box not in ('Other')ee
+--where row_num=1)e
+--on a.DR_Date=e.DR_Date and a. [Session]=e. [Session]
+--group by a.DR_Date, a. [Session], b. [open], c. [Close], d. [High],d.[Close],e. [Low],e. [Close]
+--order by DR_Date asc
+
+
+--First close time above high during a session
+--Get all the close that is above or below the DR High or Low to determine L or S day
+--#tmp4 is an auxilary dataset for #tmp5
+drop table if exists #tmp4
+Select a.*,
+	b.DR_High,
+	b.DR_Low,
+	case when (a. [Close]>b.DR_High) then 1 else 0 end as Conf_high_test, --if any close above DR_H then Long
+	case when (a. [Close]<b.DR_Low) then 1 else 0 end as Conf_Low_test, --If any close below DR_L then Short
+	case when (a. [Close]>b.DR_High) or (a.[Close]<b.[DR_Low]) then 1 else 0 end as Conf_test --determing if candle is inside or outside DR
+into #tmp4
+from #tmp2 a
+left join #tmp3 b
+on a.Dr_Date=b.DR_Date and a. [Session]=b. [Session]
+
+
+--Figure out confimation time
+--#tmp5 stores all the important time and confirmation direction
+--Figure out confimation time
+--#tmp5 stores all the important time and confirmation direction
+Select * from #tmp4
+
+drop table if exists #tmp5
+
+Select e.*, aaaa.First_Conf_TradingDateTime, aaaa.First_Conf_Time, bbbb.Long_Conf_TradingDateTime, bbbb.Long_Conf_Time,
+	cccc.Short_Conf_TradingDateTime, cccc.Short_Conf_Time,
+	case when (aaaa.First_Conf_TradingDateTime=bbbb.Long_Conf_TradingDateTime) then 'Long'
+		 when (aaaa.First_Conf_TradingDateTime=cccc.Short_Conf_TradingDateTime) then 'Short'
+	else 'No Conf' end as [Conf_Direction],
+	
+	case when bbbb.Long_Conf_TradingDateTime is not null and cccc.Short_Conf_TradingDateTime is not null then 'F'
+		else 'T' end as [TF Day],
+	--DATEADD(SECOND, DATEDIFF(SECOND, '00:00:00', bbbb.Long_Conf_TradingDateTime) + DATEDIFF(SECOND, '00:00:00', cccc.Short_Conf_TradingDateTime) - DATEDIFF(SECOND, '00:00:00', aaaa.FirstTradingDateTime), '00:00:00') AS [False DateTime],
+
+    CASE
+        WHEN bbbb.Long_Conf_TradingDateTime IS NULL OR cccc.Short_Conf_TradingDateTime IS NULL THEN NULL
+        WHEN bbbb.Long_Conf_TradingDateTime > cccc.Short_Conf_TradingDateTime  THEN bbbb.Long_Conf_TradingDateTime
+        WHEN cccc.Short_Conf_TradingDateTime  > bbbb.Long_Conf_TradingDateTime THEN cccc.Short_Conf_TradingDateTime
+        ELSE NULL
+    END AS [False DateTime],
+
+	cast(CASE
+        WHEN bbbb.Long_Conf_TradingDateTime IS NULL OR cccc.Short_Conf_TradingDateTime IS NULL THEN NULL
+        WHEN bbbb.Long_Conf_TradingDateTime > cccc.Short_Conf_TradingDateTime  THEN bbbb.Long_Conf_TradingDateTime
+        WHEN cccc.Short_Conf_TradingDateTime  > bbbb.Long_Conf_TradingDateTime THEN cccc.Short_Conf_TradingDateTime
+        ELSE NULL end as time)
+    AS [False Time],
+
+
+	--bbbb.Long_Conf_TradingDateTime+cccc.Short_Conf_TradingDateTime-aaaa.FirstTradingDateTime as [False DateTime],
+	--cast((bbbb.Long_Conf_TradingDateTime+cccc.Short_Conf_TradingDateTime-aaaa.FirstTradingDateTime) as Time) as [False Time],
+	
+	--DR Box Color
+	case when ff. [Open]>ff. [Close] then 'Green'
+		 when ff. [Open]<ff. [Close] then 'Red'
+		 else 'Grey' end as [Box Color],
+
+	ff.[Open], ff.[Close], ff.[DR_High], ff.[IDR_High], ff.[DR_Low], ff.[IDR_Low],
+	--tick and SD size
+	convert (decimal(10,3), (ff.IDR_High-ff.IDR_Low)/10) as SD_Size, --dollar value per SD
+	convert (decimal(10,2), (ff.IDR_High-ff.IDR_Low) *10) as SD_tick_Size
+into #tmp5
+from
+	(Select ee.DR_Date, ee.[Session]
+	from #tmp4 ee
+	where ee.[Session] in ('ADR', 'ODR', 'RDR')
+	group by ee.DR_Date, ee.[Session]) e
+
+left join
+--First Confirmation time
+	(Select aaa.[Session], aaa.DR_date, aaa.TradingDateTime as First_Conf_TradingDateTime, aaa.TimeOnly as First_Conf_Time from
+		(Select aa.*,
+			   row_number() over (partition by DR_Date, [Session] order by [TradingDateTime] asc) as row_num
+		from
+			  (Select * from #tmp4 where Conf_test=1 and [Session] in ('ADR', 'ODR', 'RDR') and DR_Box in ('Other'))aa) aaa
+		where aaa.row_num=1) aaaa
+	on e.DR_Date=aaaa.[DR_date] and e.[Session]=aaaa.[Session]
+--order by DR_Date desc
+left join
+--First Confirmation High time
+--To determine the kind of confirmation direction and T/F day, we need to take the first L or S occurance
+--First Confirmation High Time
+	((Select bbb. [Session], bbb.DR_date, bbb.TradingDateTime as Long_Conf_TradingDateTime, bbb.Timeonly as Long_Conf_Time from (
+		Select bb.*,
+			row_number() over (partition by DR_Date, [Session] order by [TradingDateTime] asc) as row_num
+	from
+	(Select * from #tmp4 where Conf_high_test=1) bb) bbb
+		where bbb.row_num=1))bbbb						
+on e.DR_Date=bbbb.[DR_date] and e.[Session]=bbbb.[Session]
+
+--First Confirmation Low time
+	left join
+	(Select ccc.[Session],ccc.DR_date,ccc.TradingDateTime as Short_Conf_TradingDateTime, ccc.TimeOnly as Short_Conf_Time from (
+		Select cc.*,
+			   row_number() over (partition by DR_Date, [Session] order by [TradingDateTime] asc) as row_num
+			   from
+		(Select * from #tmp4 where Conf_Low_test=1) cc) ccc
+		where ccc.row_num=1) cccc
+	on e.DR_Date=cccc.[DR_date] and e.[Session]=cccc.[Session]
+
+--Join important DR price level from #tmp3
+left join
+	(Select f.* from #tmp3 f where [Session] in ('ADR', 'ODR', 'RDR')) ff
+	on e.DR_Date=ff. [DR_date] and e.[Session]=ff.[Session]
+
+Select * from #tmp5 where [Close] is null order by DR_Date
+
+Select * from #tmp3 where DR_Date='2008-01-18'
+
+--SELECT 
+--    COLUMN_NAME, 
+--    DATA_TYPE
+--FROM 
+--    tempdb.INFORMATION_SCHEMA.COLUMNS
+--WHERE 
+--    TABLE_NAME LIKE '#tmp12%' ;
+
+
+Select top 10 * from [dbo].[CL_5min_IndividualCon] where TradingDateTime='2008-01-01 20:30:00.0000000'
+--Add important price levels to #tmp5
+--Determine 0 SD
+drop table if exists #tmp6
+Select a.*,
+	case when Conf_Direction in ('Long') then IDR_High
+		 when Conf_Direction in ('Short') then IDR_Low
+		 when Conf_Direction in ('No Conf') and [Box Color] in ('Green') then IDR_High
+		 when Conf_Direction in ('No Conf') and [Box Color] in ('Red') then IDR_Low
+	--else 'sth wrong' end as [SD0]
+	end as [SD0],
+	case when Conf_Direction in ('Long') then convert(decimal(10,2),((IDR_High-DR_High)*-0.1/SD_Size))
+	     when Conf_Direction in ('Short') then convert(decimal(10,2),((IDR_Low-DR_High)*0.1/SD_Size))
+		 when Conf_Direction in ('No Conf') and [Box Color] in ('Green') then convert(decimal(10,2),((IDR_High-DR_High)*-0.1/SD_Size))
+		 when Conf_Direction in ('No Conf') and [Box Color] in ('Red') then convert(decimal(10,2),((IDR_Low-DR_High)*0.1/SD_Size))
+	--else 'sth wrong' 
+	end as [DR_High_SD],
+
+	case when Conf_Direction in ('Long') then convert(decimal(10,2),((IDR_High-DR_Low)*-0.1/SD_Size))
+	     when Conf_Direction in ('Short') then convert(decimal(10,2),((IDR_Low-DR_Low)*0.1/SD_Size))
+		 when Conf_Direction in ('No Conf') and [Box Color] in ('Green') then convert(decimal(10,2),((IDR_High-DR_Low)*-0.1/SD_Size))
+		 when Conf_Direction in ('No Conf') and [Box Color] in ('Red') then convert(decimal(10,2),((IDR_Low-DR_Low)*0.1/SD_Size))
+	--else 'sth wrong' 
+	end as [DR_Low_SD],
+
+	case when Conf_Direction in ('Long') then convert(decimal(10,2),((IDR_High-[Open])*-0.1/SD_Size))
+		 when Conf_Direction in ('Short') then convert(decimal(10,2),((IDR_Low-[Open])*0.1/SD_Size))
+		 when Conf_Direction in ('No Conf') and [Box Color] in ('Green') then convert(decimal(10,2),((IDR_High-[Open])*-0.1/SD_Size))
+		 when Conf_Direction in ('No Conf') and [Box Color] in ('Red') then convert(decimal(10,2),((IDR_Low-[Open])*0.1/SD_Size))
+	--else 'sth wrong' 
+	end as [M7Box_Open_SD],
+
+	case when Conf_Direction in ('Long') then convert(decimal(10,2),((IDR_High-[Close])*-0.1/SD_Size))
+		 when Conf_Direction in ('Short') then convert(decimal(10,2),((IDR_Low-[Close])*0.1/SD_Size))
+		 when Conf_Direction in ('No Conf') and [Box Color] in ('Green') then convert(decimal(10,2),((IDR_High-[Close])*-0.1/SD_Size))
+		 when Conf_Direction in ('No Conf') and [Box Color] in ('Red') then convert(decimal(10,2),((IDR_Low-[Close])*0.1/SD_Size))
+	--else 'sth wrong' 
+	end as [M7Box_Close_SD],
+
+
+	--for RBC
+	case
+		when [Box Color] in ('Green') then IDR_High
+		when [Box Color] in ('Red') then IDR_Low
+	--else 'No Box Color' 
+	end as [BoxSD0],
+
+	--Determine open and close by box color for RBC backtesting
+	case when [Box Color] in ('Green') then convert(decimal(10,2),((IDR_High-[Close])*-0.1/SD_Size))
+		 when [Box Color] in ('Red') then convert(decimal(10,2),((IDR_Low-[Close])*0.1/SD_Size))
+		 end as [M7Box_Color_Close_SD],
+
+	--To determine M7 box position, use Open and close line as if it is always long
+	convert(decimal(10,2),((IDR_High-[Open])*-0.1/SD_Size)) as [Raw_OpenSD],
+	convert(decimal(10,2),((IDR_High-[CLose])*-0.1/SD_Size)) as [Raw_CloseSD],
+
+	----Where is 0.5SD
+	convert(decimal(10,2),(IDR_High-SD_Size*5)) as [SD-05]
+into #tmp6
+from #tmp5 a
+
+Select top 10* from #tmp6
+--join original dataset with DR level
+drop table if exists #tmp7
+Select a.*,
+       b.First_Conf_TradingDateTime,
+	   b.First_Conf_Time,
+	   b.Conf_Direction,
+	   b.[TF Day],
+	   b.[False Time],
+	   b.[Box Color],
+	   b.[Open] as [SessionOpen],
+	   b.[Close] as [SessionClose],
+	   b.DR_high,
+	   b.IDR_High,
+	   b.DR_low,
+	   b.IDR_low,
+	   b.SD_Size,
+	   b.SD_tick_Size,
+	   b.SD0,
+	   b.DR_High_SD,
+	   b.DR_Low_SD,
+	   b.M7Box_Open_SD,
+	   b.M7Box_Close_SD,
+	   b.BoxSD0,
+	   b.[M7Box_Color_Close_SD],
+	   b.Raw_OpenSD,
+	   b.Raw_CloseSD,
+	   b.[SD-05]
+	into #tmp7
+	from #tmp2 a
+		left join #tmp6 b
+	on a.[DR_date]=b.[DR_date] and a.[session]=b.[session]
+
+Select top 10 * from #tmp7
+
+Select * from #tmp7 where DR_date>='2024-10-14'
+
+/************Backtesting************/
+--Testing sucess rate at DR entry
+drop table if exists #tmp8
+
+Declare @SD_Target decimal(4,2);
+Declare @SD_SL decimal(4,2);
+Declare @plus_tick decimal(4,2);
+set @SD_Target=1.0;
+set @SD_SL=-0.2;
+set @plus_tick=3;
+
+Select a.*,
+		[DR_high] as [Entry],
+		case when [DR_high] between [Low] and [High] then 1 else 0 end as [Qualify_Entry_Time],
+		[SD0]+(@SD_SL*10* [SD_Size])-(0.01*@plus_tick) as [SL],
+		case when [Low]<=([SD0]+(@SD_SL*10* [SD_Size])-(0.01*@plus_tick)) then 1 else 0 end as [SL_hit],
+		[SD0]+(@SD_Target*10*SD_Size) as [TP],
+		case when [High]>=([SD0]+(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
+	into #tmp8
+	from #tmp7 a
+	where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and TradingDateTime>[First_Conf_TradingDateTime] and Conf_Direction in ('Long')
+	union all
+Select a.*,
+	[DR_Low] as [Entry],
+	case when [DR_Low] between [Low] and [High] then 1 else 0 end as [Qualify_Entry_Time],
+	[SD0] - (@SD_SL*10* [SD_Size])+(0.01*@plus_tick) as [SL],
+	case when [High]>=([SD0]-(@SD_SL*10* [SD_Size])+(0.01*@plus_tick)) then 1 else 0 end as [SL_hit],
+	[SD0]-(@SD_Target*10*SD_Size) as [TP],
+	case when [Low]<= ([SD0]-(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
+from #tmp7 a
+where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and TradingDateTime>[First_Conf_TradingDateTime] and Conf_Direction in ('Short')
+
+
+drop table if exists #tmp9
+
+Select a.DR_date,a.[session],a.Conf_Direction,
+	   a.FirstEntryTime,
+	   b.Stop_Out_Time
+into #tmp9
+from
+	(Select DR_date,[session],Conf_Direction,
+		cast(min(TradingDateTime) as Time) as FirstEntryTime
+	from #tmp8
+	where [Qualify_Entry_Time]=1
+	group by DR_date,[session],Conf_Direction) a
+left join
+	(Select DR_date,[session],
+		cast(min(TradingDateTime) as Time) as [Stop_Out_Time]
+	from #tmp8
+	where [SL_hit]=1 group by DR_date,[session]) b
+	on a.DR_date=b.DR_date
+	order by DR_date desc
+
+Drop table if exists #FirstEntry
+Select DR_date,[session],Conf_Direction,	
+	cast(min (TradingDateTime) as Time) as FirstEntryTime
+	into #FirstEntry
+from #tmp8
+where [Qualify_Entry_Time]=1
+group by DR_date,[session],Conf_Direction
+
+drop table if exists #TPreach
+Select c.DR_date, c.[session],
+	cast(min (TradingDateTime) as Time) as [TP_Reach_Time]
+into #TPreach
+from #tmp8 c
+join #FirstEntry fe on c.DR_date=fe.DR_date and c.[session]=fe.[session] --inner join
+where [TP_hit]=1 and c.Timeonly>=fe.FirstEntryTime group by c.DR_date,c.[session]
+
+
+
+--Select * from #TPreach order by Dateonly desc
+drop table if exists #tmp10
+Select a.* ,
+	b.[TP_Reach_Time]
+	into #tmp10
+	from #tmp9 a 
+left join #TPreach b 
+	on a.DR_date=b.DR_date and a.[session]=b.[session]
+--All dates with no entry
+
+drop table if exists #tmp11
+Select DR_date,[session],Conf_Direction, cast(null as dateTime) as FirstEntryTime
+	into #tmp11
+from #tmp8 
+group by DR_date,[session],Conf_Direction
+having sum(Qualify_Entry_Time)=0
+
+
+drop table if exists #tmp12
+Select a.*,b.Stop_Out_Time,c.[TP_Reach_Time] 
+	into #tmp12 
+	from #tmp11 a
+left join
+		(Select DR_date,[session],Conf_Direction,
+		cast(min(TradingDateTime) as Time) as [Stop_Out_Time]
+	from #tmp8
+		where [SL_hit]=1 group by DR_date,[session],Conf_Direction) b
+		on a.DR_date=b.DR_date and a.[session]=b.[session]
+left join
+		(Select DR_date,[session],
+		cast(min(TradingDateTime) as Time) as [TP_Reach_Time]
+	from #tmp8 
+		where [TP_hit]=1 group by DR_date,[session])c
+		on a.DR_date=b.DR_date and a.[session]=b.[session]
+	
+Select * into #Result 
+	from #tmp10
+	union all 
+Select * from #tmp12
+
+Select top 100* from #Result
+
+--Determining if the entry is a sucess or fail
+Select a.*,
+	case when FirstEntrytime is null then 'NoEntry'
+	     when FirstEntrytime is not null and Stop_Out_Time is null and TP_Reach_Time is null then 'Exit'--TP not reach but also did not hit the SL
+		 when FirstEntrytime is not null and Stop_Out_Time is not null and TP_Reach_Time is null then 'Fail'
+		 when FirstEntrytime is not null and Stop_Out_Time is null and TP_Reach_Time is not null then 'Success'
+		 when FirstEntrytime is not null and Stop_Out_Time is not null and TP_Reach_Time is not null and TP_Reach_Time<Stop_Out_time then 'Success' --if target reach before any stop loss then the trade is successful
+		 when FirstEntrytime is not null and Stop_Out_Time is not null and TP_Reach_Time is not null and TP_Reach_Time>=Stop_Out_time then 'Fail'
+	end as [Outcome]
+	into #tmp13
+from #Result a
+order by DR_date desc
+
+--Join with entry, SL and TP
+drop table if exists #tmp14
+Select a.*,b.[Entry],b.[SL],b.[TP],b.[SessionClosePrice]
+	into #tmp14
+	from #tmp13 a
+	left join
+(Select DR_date,[session],[Entry],SL,TP,[Close] as [SessionClosePrice] 
+	from #tmp8
+where Timeonly in ('01:55:00','08:25:00','15:55:00')
+group by DR_date,[session],[Entry],SL,TP,[Close])b
+on a.DR_date=b.DR_date and a.[session]=b.[session]
+
+Select top 10* from #FirstEntry
+--determine R achieved
+Select a.DR_date, a.FirstEntryTime,
+	   b.Stop_Out_Time,
+	   c.[TP_Reach_Time]
+	from
+		#FirstEntry a
+	left join
+		(Select Dateonly,
+			min(Timeonly) as [Stop_Out_Time]
+			from #tmp8
+		where [SL_hit]=1 group by Dateonly)b
+	on a.DR_date=b.Dateonly
+	left join
+		#TPreach c
+	on a.DR_date=c.DR_date
+	group by a.DR_date, a.FirstEntryTime, b.Stop_Out_Time, c.[TP_Reach_Time]
+
+
+
+
+
+
 /************************/
 --For RBC
 --It will be base on box color
