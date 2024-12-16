@@ -525,6 +525,65 @@ Select a.*,b.Model
 	from #DailyInfo01 a
 left join #Model04 b
 on a.[DR_Date]=b.[DR_Date] and a.[Session]=b.[Session] 
+
+--Has any close ever violated RBC box color
+--Find crossover time
+
+Drop table if exists #M7Broken01
+
+Select
+	DR_date,
+	TradingDateTime,
+	Timeonly,
+[session],
+DR_Box,
+row_number() over (partition by DR_date,[Session] order by TradingDateTime) as row_num
+into #M7GreenBrokenTimes
+from #tmp7
+where (TradingDateTime<FirstConfDateTime) and [Session] in ('ADR','ODR','RDR') and DR_Box='Other' and [Box Color]='Green' and [Close]<[SessionOpen]
+
+Select
+	DR_date,
+	TradingDateTime as M7_Brokendatetime,
+	Timeonly as M7_Broken,
+	[Session],
+	DR_Box
+into #FirstM7GreenBroken
+from #M7GreenBrokenTimes
+where row_num=1
+
+Select
+	DR_date,
+	TradingDateTime,
+	Timeonly,
+[session],
+DR_Box,
+row_number() over (partition by DR_date,[Session] order by TradingDateTime) as row_num
+into #M7RedBrokenTimes
+from #tmp7
+where (TradingDateTime<FirstConfDateTime) and [Session] in ('ADR','ODR','RDR') and DR_Box='Other' and [Box Color]='Red' and [Close]>[SessionOpen]
+
+Select
+	DR_date,
+	TradingDateTime as M7_Brokendatetime,
+	Timeonly as M7_Broken,
+	[Session],
+	DR_Box
+into #FirstM7RedBroken
+from #M7RedBrokenTimes
+where row_num=1
+
+Select DR_date,DR_Box,[session],M7_Broken
+	into #M7Broken01
+from #FirstM7GreenBroken
+union all
+Select DR_date,DR_Box,[session],M7_Broken
+from #FirstM7RedBroken
+
+
+
+
+
  
 
 
