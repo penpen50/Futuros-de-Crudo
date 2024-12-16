@@ -885,6 +885,7 @@ FirstODRBrokenTime as (
 from ODRBrokenTimes 
 where row_num=1)
 
+/????????? Somehting missing
 Select a.DR_date,a.ADR_Broken, a.ADR_Broken_session,a.ADR_Broken_Box,
 		b.ODR_Broken, b.ODR_Broken_session,b.ODR_Broken_Box
 	into #DailyInfo01
