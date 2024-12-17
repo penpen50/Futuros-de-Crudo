@@ -267,6 +267,9 @@ Select a.*,
 
 	----Where is 0.5SD
 	convert(decimal(10,2),(IDR_High-SD_Size*5)) as [SD-05]
+
+--First Candle Confirmation
+	case when First_Conf_Time in ('20:30','04:00','10:30) then 1 else 0 end as FirstCandleConf
 into #tmp6
 from #tmp5 a
 
