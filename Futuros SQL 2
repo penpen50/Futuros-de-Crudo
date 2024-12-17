@@ -1,3 +1,4 @@
+
 Select top 10 * from  [dbo].[CL_5min_IndividualCon]
 drop table if exists #tmp1
 Select a.[TradingDateTime],
@@ -460,7 +461,21 @@ into #tmp15
 from #tmp14
 								
 --determine R achieved
-Select a.DR_date, a.FirstEntryTime,
+
+
+
+Select * from #tmp15
+drop table if exists #tmp16
+Select a.*,
+	convert(decimal(10,2),case when [Outcome]='No Entry' then 0
+														 when [Outcome]='Fail' then -1
+                             when [Outcome]='Success' then PotentialRR
+       											 when [Outcome]='Exit' then (PL)/abs([Entry]-SL)
+	end) as [RR])
+into #tmp16
+from #tmp15 a
+
+Select * from #tmp16Select a.DR_date, a.FirstEntryTime,
 	   b.Stop_Out_Time,
 	   c.[TP_Reach_Time]
 	from
@@ -898,9 +913,17 @@ where row_num=1)
 /????????? Somehting missing
 Select a.DR_date,a.ADR_Broken, a.ADR_Broken_session,a.ADR_Broken_Box,
 		b.ODR_Broken, b.ODR_Broken_session,b.ODR_Broken_Box
+	into #Broken01
+from FirstADRBrokenTime a
+left join FirstODRBrokenTime b
+on a.DR_date=b.DR_date
+
+--Add broken info to dailyinfo dataset
+Select a.*,b.DR_date,b.ADR_Broken, b.ADR_Broken_session,b.ADR_Broken_Box,
+		b.ODR_Broken, b.ODR_Broken_session,b.ODR_Broken_Box
 	into #DailyInfo01
 from #tmp6 a
-left join #Broken01 b
+left join #Broken01 b          
 on a.DR_date=b.DR_date
 
 Select * from #DAilyInfo01 order by DR_dae desc
