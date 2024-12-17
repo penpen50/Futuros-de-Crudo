@@ -445,6 +445,20 @@ group by DR_date,[session],[Entry],SL,TP,[Close])b
 on a.DR_date=b.DR_date and a.[session]=b.[session]
 
 Select top 10* from #FirstEntry
+
+--Calculate R
+Select *,
+		case 
+				when [Outcome]='No Entry' then 0
+				when [Outcome]='Fail' then abs(Entry-SL)*-1
+				when [Outcome]='Success' then abs(Entry-TP)
+				when [Outcome]='Exit' and Conf_Direction='Long' then (SessionClosePrice-[Entry])
+			 when [Outcome]='Exit' and Conf_Direction='Short' then ([Entry]-SessionClosePrice)
+		end as [PL]
+		convert(decimal(10,2),abs(([Entry]-TP/([Entry]-SL))) as RR
+into #tmp15
+from #tmp14
+								
 --determine R achieved
 Select a.DR_date, a.FirstEntryTime,
 	   b.Stop_Out_Time,
@@ -452,19 +466,15 @@ Select a.DR_date, a.FirstEntryTime,
 	from
 		#FirstEntry a
 	left join
-		(Select Dateonly,
+		(Select DR_date,
 			min(Timeonly) as [Stop_Out_Time]
 			from #tmp8
-		where [SL_hit]=1 group by Dateonly)b
-	on a.DR_date=b.Dateonly
+		where [SL_hit]=1 group by DR_date)b
+	on a.DR_date=b.DR_date
 	left join
 		#TPreach c
 	on a.DR_date=c.DR_date
 	group by a.DR_date, a.FirstEntryTime, b.Stop_Out_Time, c.[TP_Reach_Time]
-
-
-
-
 
 
 /************************/
