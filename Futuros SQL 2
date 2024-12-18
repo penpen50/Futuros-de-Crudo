@@ -250,8 +250,14 @@ else 'Sth wrong' end as [M7Box_Color_Close_SD],
 
 --First Candle Confirmation
 	case when First_Conf_Time in ('20:30','04:00','10:30) then 1 else 0 end as FirstCandleConf
-into #tmp6
+into #tmp6_1
 from #tmp5 a
+
+drop table if exists #tmp6
+Select *,
+ abs([Raw_OpenSD]-[Raw_CloseSD]) as M7BoxSize
+into #tmp6
+from #tmp6_1
 
 Select top 10* from #tmp6
 --join original dataset with DR level
