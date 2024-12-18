@@ -13,9 +13,6 @@ convert(decimal(10,2),[Close]) as [Close],
 into #tmp1
 from  [dbo].[CL_5min_IndividualCon]  a
 
-
-
-
 Select * from [dbo].[CL_5min_IndividualCon]  order by TradingDateTime desc
 
 drop table if exists #tmp2
@@ -43,7 +40,6 @@ from #tmp1 b
 
 Select top 10 * from #tmp2
 
-
 drop table if exists #tmp3
 --Select a.DR_Date,a. [Session] from #tmp2 a group by a.DR_Date,a. [Session] order by a.DR_Date
 
@@ -62,8 +58,9 @@ left join
 	on a.DR_Date=c.DR_Date and a.[Session]=c.[Session]
 left join
 --DR is highest high and lowest Low
-		(Select d.DR_Date, d.[Session], max(d.[HighLow]) as DR_high, min (d.[HighLow]) as DR_Low 				from
-							(Select DR_Date, [Session], [High] as [HighLow] from #tmp2 where DR_Box not in ('Other') 
+		(Select d.DR_Date, d.[Session], max(d.[HighLow]) as DR_high, min (d.[HighLow]) as DR_Low 				
+			from
+		(Select DR_Date, [Session], [High] as [HighLow] from #tmp2 where DR_Box not in ('Other') 
 		 union all
 	     Select DR_Date, [Session], [Low] as [HighLow] from #tmp2 where DR_Box not in ('Other')) d 
 	 group by d.DR_Date, d.[Session]) dd
@@ -72,9 +69,9 @@ left join
 --IDR high and IDR low is the highest and lowest of Open and Close
 	(Select e.DR_Date, e.[Session], max(e.[Close]) as IDR_high, min (e.[Close]) as IDR_Low
 			from #tmp2 e where DR_box not in ('Other') group by e.DR_Date, e.[Session])ee
-	on a.DR_Date=ee.DR_Date and a. [Session]=ee.[Session]
+	on a.DR_Date=ee.DR_Date and a.[Session]=ee.[Session]
 where a.[Session] in ('ADR','ODR','RDR')
-group by a.DR_Date, a.[Session], b.[Open], c. [Close], dd.DR_High, eeIDR_High, dd.DR_Low, ee.IDR_Low
+group by a.DR_Date, a.[Session], b.[Open], c.[Close], dd.DR_High, ee.IDR_High, dd.DR_Low, ee.IDR_Low
 
 Select * from #tmp3 where DR_Date>='2024-11-01' order by DR_Date desc
 
@@ -194,10 +191,10 @@ Select * from #tmp3 where DR_Date='2008-01-18'
 
 --Add important price levels to #tmp5
 --Determine 0 SD
-drop table if exists #tmp6
+drop table if exists #tmp6_1
 Select a.*,
 	case 
-			when Conf_Direction in ('Long') then IDR_High
+		 when Conf_Direction in ('Long') then IDR_High
 		 when Conf_Direction in ('Short') then IDR_Low
 		 when Conf_Direction in ('No Conf') and [Box Color] in ('Green') then IDR_High
 		 when Conf_Direction in ('No Conf') and [Box Color] in ('Red') then IDR_Low
@@ -214,21 +211,21 @@ Select a.*,
 	  when Conf_Direction in ('Short') then convert(decimal(10,2),((IDR_Low-DR_Low)*0.1/SD_Size))
 		 when Conf_Direction in ('No Conf') and [Box Color] in ('Green') then convert(decimal(10,2),((IDR_High-DR_Low)*-0.1/SD_Size))
 		 when Conf_Direction in ('No Conf') and [Box Color] in ('Red') then convert(decimal(10,2),((IDR_Low-DR_Low)*0.1/SD_Size))	
-end as [DR_Low_SD],
+	end as [DR_Low_SD],
 
-case 
+	case 
 		when Conf_Direction in ('Long') then convert(decimal(10,2),((IDR_High-[Open])*-0.1/SD_Size))
 		when Conf_Direction in ('Short') then convert(decimal(10,2),((IDR_Low-[Open])*0.1/SD_Size))
 		when Conf_Direction in ('No Conf') and [Box Color] in ('Green') then convert(decimal(10,2),((IDR_High-[Open])*-0.1/SD_Size))
 		when Conf_Direction in ('No Conf') and [Box Color] in ('Red') then convert(decimal(10,2),((IDR_Low-[Open])*0.1/SD_Size)) 
 	end as [M7Box_Open_SD],
 
-case 
+	case 
 		when Conf_Direction in ('Long') then convert(decimal(10,2),((IDR_High-[Close])*-0.1/SD_Size))
 		 when Conf_Direction in ('Short') then convert(decimal(10,2),((IDR_Low-[Close])*0.1/SD_Size))
 		 when Conf_Direction in ('No Conf') and [Box Color] in ('Green') then convert(decimal(10,2),((IDR_High-[Close])*-0.1/SD_Size))
 		 when Conf_Direction in ('No Conf') and [Box Color] in ('Red') then convert(decimal(10,2),((IDR_Low-[Close])*0.1/SD_Size))
-end as [M7Box_Close_SD],
+	end as [M7Box_Close_SD],
 
 	--for RBC
 	case
@@ -239,17 +236,17 @@ end as [M7Box_Close_SD],
 	--Determine open and close by box color for RBC backtesting
 	case when [Box Color] in ('Green') then convert(decimal(10,2),((IDR_High-[Close])*-0.1/SD_Size))
 		 when [Box Color] in ('Red') then convert(decimal(10,2),((IDR_Low-[Close])*0.1/SD_Size))
-else 'Sth wrong' end as [M7Box_Color_Close_SD],
+	end as [M7Box_Color_Close_SD],
 
 	--To determine M7 box position, use Open and close line as if it is always long
 	convert(decimal(10,2),((IDR_High-[Open])*-0.1/SD_Size)) as [Raw_OpenSD],
 	convert(decimal(10,2),((IDR_High-[Close])*-0.1/SD_Size)) as [Raw_CloseSD],
 
 	----Where is 0.5SD
-	convert(decimal(10,2),(IDR_High-SD_Size*5)) as [SD-05]
+	convert(decimal(10,2),(IDR_High-SD_Size*5)) as [SD-05],
 
 --First Candle Confirmation
-	case when First_Conf_Time in ('20:30','04:00','10:30) then 1 else 0 end as FirstCandleConf
+	case when First_Conf_Time in ('20:30','04:00','10:30') then 1 else 0 end as FirstCandleConf
 into #tmp6_1
 from #tmp5 a
 
@@ -328,7 +325,7 @@ Select a.*,
 from #tmp7 a
 where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and TradingDateTime>[First_Conf_TradingDateTime] and Conf_Direction in ('Short')
 
-
+/*!!!Solve ADR issue**/
 drop table if exists #tmp9
 
 Select a.DR_date,a.[session],a.Conf_Direction,
@@ -378,7 +375,8 @@ left join #TPreach b
 --All dates with no entry
 
 drop table if exists #tmp11
-Select DR_date,[session],Conf_Direction, cast(null as dateTime) as FirstEntryTime
+Select DR_date,[session],Conf_Direction,
+    cast(null as Time) as FirstEntryTime
 	into #tmp11
 from #tmp8 
 group by DR_date,[session],Conf_Direction
@@ -401,19 +399,21 @@ left join
 	from #tmp8 
 		where [TP_hit]=1 group by DR_date,[session])c
 		on a.DR_date=c.DR_date and a.[session]=c.[session]
-	
+
+drop table if exists #Result	
 Select * into #Result 
 	from #tmp10
 	union all 
 Select * from #tmp12
 
-Select top 100* from #Result
+Select top 100* from #Result where DR_Date in ('2023-11-14','2011-09-09','2009-10-08') order by DR_Date, [Session]
 
 --Determining if the entry is a sucess or fail
+drop table if exists #tmp13
 Select a.*,
 	case 
-			when FirstEntrytime is null then 'NoEntry'
-	  when FirstEntrytime is not null and Stop_Out_Time is null and TP_Reach_Time is null then 'Exit'--TP not reach but also did not hit the SL
+		 when FirstEntrytime is null then 'NoEntry'
+		 when FirstEntrytime is not null and Stop_Out_Time is null and TP_Reach_Time is null then 'Exit'--TP not reach but also did not hit the SL
 		 when FirstEntrytime is not null and Stop_Out_Time is not null and TP_Reach_Time is null then 'Fail'
 		 when FirstEntrytime is not null and Stop_Out_Time is null and TP_Reach_Time is not null then 'Success'
 		 when FirstEntrytime is not null and Stop_Out_Time is not null and TP_Reach_Time is not null and TP_Reach_Time<Stop_Out_time then 'Success' --if target reach before any stop loss then the trade is successful
@@ -438,32 +438,34 @@ on a.DR_date=b.DR_date and a.[session]=b.[session]
 Select top 10* from #FirstEntry
 
 --Calculate R
+drop table if exists #tmp15
 Select *,
 		case 
-				when [Outcome]='No Entry' then 0
-				when [Outcome]='Fail' then abs(Entry-SL)*-1
-				when [Outcome]='Success' then abs(Entry-TP)
-				when [Outcome]='Exit' and Conf_Direction='Long' then (SessionClosePrice-[Entry])
-			 when [Outcome]='Exit' and Conf_Direction='Short' then ([Entry]-SessionClosePrice)
-		end as [PL]
-		convert(decimal(10,2),abs(([Entry]-TP/([Entry]-SL))) as RR
+			when [Outcome]='No Entry' then 0
+			when [Outcome]='Fail' then abs(Entry-SL)*-1
+			when [Outcome]='Success' then abs(Entry-TP)
+			when [Outcome]='Exit' and Conf_Direction='Long' then (SessionClosePrice-[Entry])
+			when [Outcome]='Exit' and Conf_Direction='Short' then ([Entry]-SessionClosePrice)
+		end as [PL],
+		convert(decimal(10,2),abs(([Entry]-TP)/([Entry]-SL))) as PotentialRR
+
 into #tmp15
 from #tmp14
 								
 --determine R achieved
 
-
-
-Select * from #tmp15
 drop table if exists #tmp16
 Select a.*,
-	convert(decimal(10,2),case when [Outcome]='No Entry' then 0
-														 when [Outcome]='Fail' then -1
-              when [Outcome]='Success' then PotentialRR
-       											 when [Outcome]='Exit' then (PL)/abs([Entry]-SL)
+	convert(decimal(10,2),
+		case when [Outcome]='No Entry' then 0
+			 when [Outcome]='Fail' then -1
+             when [Outcome]='Success' then PotentialRR
+             when [Outcome]='Exit' then (PL)/abs([Entry]-SL)
 	end) as [RR]
 into #tmp16
 from #tmp15 a
+
+Select top 100 * from #tmp16
 
 Select a.DR_date, a.FirstEntryTime,
 	   b.Stop_Out_Time,
@@ -1073,48 +1075,3 @@ from #FirstM7GreenBroken
 union all
 Select DR_date,DR_Box,[session],M7_Broken
 from #FirstM7RedBroken
-
-
-
-
-
- 
-
-
-
-
-
-
-
-
-
- 
-
-
-
-
- 
-
-
-
-
-
-
-
-
-
-
-
-                                  
-
-
- 
-
-
-
-
-
-
-
-
-
