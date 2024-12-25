@@ -1,5 +1,5 @@
 
-Select top 10 * from  [dbo].[CL_5min_IndividualCon]
+Select top 10 * from  [dbo].[CL_5min_IndividualCon] where TradingDatetime='2008-08-31 16:10:00.0000000'
 
 drop table if exists #tmp1
 Select a.[TradingDateTime],
@@ -13,33 +13,43 @@ convert(decimal(10,2),[Close]) as [Close],
 into #tmp1
 from  [dbo].[CL_5min_IndividualCon]  a
 
-Select * from [dbo].[CL_5min_IndividualCon]  order by TradingDateTime desc
+Select * from [dbo].[CL_5min_IndividualCon] where TradingDateTime='10/28/2024 18:05' and Volume=21
+
+Select Dateonly,count(Dateonly)  from #tmp1 group by Dateonly order by Dateonly desc
 
 drop table if exists #tmp2
 Select b.*,
 	case when b.[Close]>b.[Open] then 'Green Candle' else 'Red Candle' end as Candle_Color,
 	case 
-			when TimeOnly between '00:00' and '02:00' then 'ADR'
+	     when TimeOnly between '00:00' and '02:00' then 'ADR'
 		 when TimeOnly between '02:05' and '02:55' then 'ADR-ODR'
 		 when TimeOnly between '03:00' and '08:30' then 'ODR'
 		 when TimeOnly between '08:35' and '09:25' then 'ODR-RDR'
-	  when TimeOnly between '09:30' and '16:00' then 'RDR'
+	     when TimeOnly between '09:30' and '16:00' then 'RDR'
 		 when TimeOnly between '16:05' and '19:25' then 'RDR-ADR'
 		 when TimeOnly between '19:30' and '23:55' then 'ADR'
 else 'Something wrong' end as session,
  case 
-			when TimeOnly between '03:00' and '03:55' then 'ODR DR Box'
+		 when TimeOnly between '03:00' and '03:55' then 'ODR DR Box'
 		 when TimeOnly between '09:30' and '10:25' then 'RDR DR Box'
    when TimeOnly between '19:30' and '20:25' then 'ADR DR Box'
 		 else 'Other' end as [DR_Box],
-	case when TimeOnly between '19:30' and '23:55' then dateadd(day,1,Dateonly)
+	case when TimeOnly between '18:00' and '23:55' then dateadd(day,1,Dateonly) --between '19:30' and '23:55'
 		 else DateOnly end as [DR_date]
-into #tmp2
+	into #tmp2
 from #tmp1 b
 
-
-Select top 10 * from #tmp2
-
+drop table if exists #tmp2_1
+Select *, 	case format(DR_date,'ddd') 
+		when 'Mon' then 1
+		when 'Tue' then 2
+		when 'Wed' then 3
+		when 'Thu' then 4
+		when 'Fri' then 5
+		when 'Sat' then 6
+		when 'Sun' then 7
+	end as DoW into #tmp2_1 from #tmp2
+Select * from #tmp2_1 where DoW=7 order by TradingDateTime
 drop table if exists #tmp3
 --Select a.DR_Date,a. [Session] from #tmp2 a group by a.DR_Date,a. [Session] order by a.DR_Date
 
@@ -166,7 +176,7 @@ on e.DR_Date=bbbb.[DR_date] and e.[Session]=bbbb.[Session]
 	left join
 		(Select ccc.[Session],ccc.DR_date,ccc.TradingDateTime as Short_Conf_TradingDateTime, ccc.TimeOnly as Short_Conf_Time from (
 				Select cc.*,
-			   row_number() over (partition by DR_Date, [Session] order by [TradingDateTime] asc) 		as row_num
+			   row_number() over (partition by DR_Date, [Session] order by [TradingDateTime] asc) as row_num
 			   from
 		(Select * from #tmp4 where Conf_Low_test=1) cc) ccc
 		where ccc.row_num=1) cccc
@@ -200,15 +210,15 @@ Select a.*,
 		 when Conf_Direction in ('No Conf') and [Box Color] in ('Red') then IDR_Low
 	end as [SD0],
 	case 
-			when Conf_Direction in ('Long') then convert(decimal(10,2),((IDR_High-DR_High)*-0.1/SD_Size))
-	  when Conf_Direction in ('Short') then convert(decimal(10,2),((IDR_Low-DR_High)*0.1/SD_Size))
+		 when Conf_Direction in ('Long') then convert(decimal(10,2),((IDR_High-DR_High)*-0.1/SD_Size))
+		 when Conf_Direction in ('Short') then convert(decimal(10,2),((IDR_Low-DR_High)*0.1/SD_Size))
 		 when Conf_Direction in ('No Conf') and [Box Color] in ('Green') then convert(decimal(10,2),((IDR_High-DR_High)*-0.1/SD_Size))
 		 when Conf_Direction in ('No Conf') and [Box Color] in ('Red') then convert(decimal(10,2),((IDR_Low-DR_High)*0.1/SD_Size))
 	end as [DR_High_SD],
 
 	case 
-			when Conf_Direction in ('Long') then convert(decimal(10,2),((IDR_High-DR_Low)*-0.1/SD_Size))
-	  when Conf_Direction in ('Short') then convert(decimal(10,2),((IDR_Low-DR_Low)*0.1/SD_Size))
+		 when Conf_Direction in ('Long') then convert(decimal(10,2),((IDR_High-DR_Low)*-0.1/SD_Size))
+	     when Conf_Direction in ('Short') then convert(decimal(10,2),((IDR_Low-DR_Low)*0.1/SD_Size))
 		 when Conf_Direction in ('No Conf') and [Box Color] in ('Green') then convert(decimal(10,2),((IDR_High-DR_Low)*-0.1/SD_Size))
 		 when Conf_Direction in ('No Conf') and [Box Color] in ('Red') then convert(decimal(10,2),((IDR_Low-DR_Low)*0.1/SD_Size))	
 	end as [DR_Low_SD],
@@ -221,7 +231,7 @@ Select a.*,
 	end as [M7Box_Open_SD],
 
 	case 
-		when Conf_Direction in ('Long') then convert(decimal(10,2),((IDR_High-[Close])*-0.1/SD_Size))
+	 	 when Conf_Direction in ('Long') then convert(decimal(10,2),((IDR_High-[Close])*-0.1/SD_Size))
 		 when Conf_Direction in ('Short') then convert(decimal(10,2),((IDR_Low-[Close])*0.1/SD_Size))
 		 when Conf_Direction in ('No Conf') and [Box Color] in ('Green') then convert(decimal(10,2),((IDR_High-[Close])*-0.1/SD_Size))
 		 when Conf_Direction in ('No Conf') and [Box Color] in ('Red') then convert(decimal(10,2),((IDR_Low-[Close])*0.1/SD_Size))
@@ -250,13 +260,57 @@ Select a.*,
 into #tmp6_1
 from #tmp5 a
 
+
 drop table if exists #tmp6
-Select *,
- abs([Raw_OpenSD]-[Raw_CloseSD]) as M7BoxSize
+Select 
+	DR_Date,
+ 	case format(DR_date,'ddd') 
+		when 'Mon' then 1
+		when 'Tue' then 2
+		when 'Wed' then 3
+		when 'Thu' then 4
+		when 'Fri' then 5
+		when 'Sat' then 6
+		when 'Sun' then 7
+	end as DoW,
+	[Session],
+	First_Conf_TradingDateTime,
+	First_Conf_Time,
+	Long_Conf_TradingDateTime,
+	Long_Conf_Time,
+	Short_Conf_TradingDateTime,
+	Short_Conf_Time,
+	Conf_Direction,
+	[TF Day],
+	[False DateTime],
+	[False Time],
+	[Box Color],
+	[Open],
+	[Close],
+	DR_High,
+	IDR_High,
+	DR_Low,
+	IDR_Low,
+	SD_Size,
+	SD_tick_Size,
+	SD0,
+	DR_High_SD,
+	DR_Low_SD,
+	M7Box_Open_SD,
+	M7Box_Close_SD,
+	BoxSD0,
+	M7Box_Color_Close_SD,
+	Raw_OpenSD,
+	Raw_CloseSD,
+	[SD-05],
+	FirstCandleConf,
+	abs([Raw_OpenSD]-[Raw_CloseSD]) as M7BoxSize
 into #tmp6
 from #tmp6_1
 
-Select top 10* from #tmp6
+Select top 10* from #tmp6 where Dow=7
+
+
 --join original dataset with DR level
 drop table if exists #tmp7
 Select a.*,
@@ -291,7 +345,7 @@ Select a.*,
 
 Select top 10 * from #tmp7
 
-Select * from #tmp7 where DR_date>='2024-10-14'
+Select * from #tmp6 where DR_date='2024-12-16'
 
 /************Backtesting************/
 --Testing sucess rate at DR entry
@@ -325,7 +379,7 @@ Select a.*,
 from #tmp7 a
 where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and TradingDateTime>[First_Conf_TradingDateTime] and Conf_Direction in ('Short')
 
-/*!!!Solve ADR issue**/
+
 drop table if exists #tmp9
 
 Select a.DR_date,a.[session],a.Conf_Direction,
@@ -334,21 +388,26 @@ Select a.DR_date,a.[session],a.Conf_Direction,
 into #tmp9
 from
 	(Select DR_date,[session],Conf_Direction,
-		cast(min(TradingDateTime) as Time) as FirstEntryTime
+	    min(TradingDateTime) as FirstEntryTime
+		--cast(min(TradingDateTime) as Time) as FirstEntryTime
 	from #tmp8
 	where [Qualify_Entry_Time]=1
-	group by DR_date,[session],Conf_Direction) a
+	group by DR_date,[session],Conf_Direction)  a
 left join
 	(Select DR_date,[session],
-		cast(min(TradingDateTime) as Time) as [Stop_Out_Time]
+	    min(TradingDateTime) as [Stop_Out_Time]
+		--cast(min(TradingDateTime) as Time) as [Stop_Out_Time]
 	from #tmp8
-	where [SL_hit]=1 group by DR_date,[session]) b
-	on a.DR_date=b.DR_date
-	order by DR_date desc
+	where [SL_hit]=1 group by DR_date,[session] ) b
+on a.DR_date=b.DR_date and a.[Session]=b.[Session]
+order by DR_date desc
+
+Select * from #tmp9 order by DR_Date desc
 
 Drop table if exists #FirstEntry
 Select DR_date,[session],Conf_Direction,	
-	cast(min (TradingDateTime) as Time) as FirstEntryTime
+	min(TradingDateTime) as FirstEntryTime
+	--cast(min (TradingDateTime) as Time) as FirstEntryTime
 	into #FirstEntry
 from #tmp8
 where [Qualify_Entry_Time]=1
@@ -356,11 +415,13 @@ group by DR_date,[session],Conf_Direction
 
 drop table if exists #TPreach
 Select c.DR_date, c.[session],
-	cast(min (TradingDateTime) as Time) as [TP_Reach_Time]
+	 min(TradingDateTime) as [TP_Reach_Time]	
+	--cast(min (TradingDateTime) as Time) as [TP_Reach_Time]
 into #TPreach
 from #tmp8 c
 join #FirstEntry fe on c.DR_date=fe.DR_date and c.[session]=fe.[session] --inner join
-where [TP_hit]=1 and c.Timeonly>=fe.FirstEntryTime group by c.DR_date,c.[session]
+where [TP_hit]=1 and c.TradingDateTime>=fe.FirstEntryTime group by c.DR_date,c.[session]
+--where [TP_hit]=1 and c.Timeonly>=fe.FirstEntryTime group by c.DR_date,c.[session]
 
 
 
@@ -372,11 +433,13 @@ Select a.* ,
 	from #tmp9 a 
 left join #TPreach b 
 	on a.DR_date=b.DR_date and a.[session]=b.[session]
+
+Select * from #tmp10 order by DR_date desc
 --All dates with no entry
 
 drop table if exists #tmp11
 Select DR_date,[session],Conf_Direction,
-    cast(null as Time) as FirstEntryTime
+    cast(null as DateTime) as FirstEntryTime
 	into #tmp11
 from #tmp8 
 group by DR_date,[session],Conf_Direction
@@ -407,7 +470,7 @@ Select * into #Result
 Select * from #tmp12
 
 Select top 100* from #Result where DR_Date in ('2023-11-14','2011-09-09','2009-10-08') order by DR_Date, [Session]
-
+Select * from #Result order by DR_date desc
 --Determining if the entry is a sucess or fail
 drop table if exists #tmp13
 Select a.*,
@@ -435,11 +498,21 @@ where Timeonly in ('01:55:00','08:25:00','15:55:00')
 group by DR_date,[session],[Entry],SL,TP,[Close])b
 on a.DR_date=b.DR_date and a.[session]=b.[session]
 
-Select top 10* from #FirstEntry
+Select top 10* from #tmp14
 
---Calculate R
+--Calculate R  
 drop table if exists #tmp15
-Select *,
+Select DR_date,[session],Conf_Direction,
+		convert(VARCHAR(5),cast(FirstEntryTime as Time),108) as [FirstEntryTime],
+		convert(VARCHAR(5),cast(Stop_Out_Time as Time),108) as [Stop_Out_Time],
+		convert(VARCHAR(5),cast(TP_Reach_Time as Time),108) as [TP_Reach_Time],
+		--cast(Stop_Out_Time as Time) as [Stop_Out_Time],
+        --cast(TP_Reach_Time as Time) as [TP_Reach_Time],
+		Outcome,
+		[Entry],
+		SL,
+		TP,
+		SessionClosePrice,
 		case 
 			when [Outcome]='No Entry' then 0
 			when [Outcome]='Fail' then abs(Entry-SL)*-1
@@ -451,7 +524,9 @@ Select *,
 
 into #tmp15
 from #tmp14
-								
+
+
+Select top 10 * from #tmp15								
 --determine R achieved
 
 drop table if exists #tmp16
@@ -465,23 +540,76 @@ Select a.*,
 into #tmp16
 from #tmp15 a
 
-Select top 100 * from #tmp16
+Select  * from #tmp16 order by DR_Date desc
+--need refine!!!!!!!!
+--Summarize the data
+Select 
+	[Session],	
+	case format(DR_date,'ddd') 
+		when 'Mon' then 1
+		when 'Tue' then 2
+		when 'Wed' then 3
+		when 'Thu' then 4
+		when 'Fri' then 5
+		when 'Sat' then 6
+		when 'Sun' then 7
+	end as DoW,
+	Outcome, count(DR_date) as Tradecount,
+	sum(RR) as RR 
+	into #tmp17
+	from #tmp16 
+group by 
+		[Session], format(DR_date,'ddd'), Outcome 
+	order by 
+		case format(DR_date,'ddd') 
+		when 'Mon' then 1
+		when 'Tue' then 2
+		when 'Wed' then 3
+		when 'Thu' then 4
+		when 'Fri' then 5
+		when 'Sat' then 6
+		when 'Sun' then 7
+	end
 
-Select a.DR_date, a.FirstEntryTime,
-	   b.Stop_Out_Time,
-	   c.[TP_Reach_Time]
-	from
-				#FirstEntry a
+	Select * from #tmp17 where DoW=7
+
+	Select a.[Session], a.DoW,a.Outcome,a.Tradecount,b.DayswithEntry,a.RR
+	into #tmp19
+	from #tmp17 a
 	left join
-		(Select DR_date,
-					min(Timeonly) as [Stop_Out_Time]
-					from #tmp8
-		where [SL_hit]=1 group by DR_date)b
-	on a.DR_date=b.DR_date
-	left join
-					#TPreach c
-	on a.DR_date=c.DR_date
-	group by a.DR_date, a.FirstEntryTime, b.Stop_Out_Time, c.[TP_Reach_Time]
+		(Select [Session], Dow, 
+			sum(case when Outcome!='NoEntry' then Tradecount else 0 end) as DayswithEntry
+		from #tmp17
+		group by [Session], Dow) b
+	on a.[Session]=b.[Session] and a.[DoW]=b.[DoW]
+
+	Select * from #tmp19
+
+	Select a.[Session], a.DoW,a.Outcome,a.Tradecount,a.DayswithEntry,
+		case when a.DayswithEntry<>0 then 
+			round((cast(a.Tradecount as float)/a.DayswithEntry)*100,2)
+		else 0
+		end as WinPercentage
+	  -- (a.Tradecount/nullif(a.DayswithEntry,0)) as WinPercentage
+		--round(a.Tradecount/nullif(a.DayswithEntry,0)*100,2) as WinPercentage
+		from #tmp19 a
+
+
+--Select a.DR_date, a.FirstEntryTime,
+--	   b.Stop_Out_Time,
+--	   c.[TP_Reach_Time]
+--	from
+--				#FirstEntry a
+--	left join
+--		(Select DR_date,
+--					min(Timeonly) as [Stop_Out_Time]
+--					from #tmp8
+--		where [SL_hit]=1 group by DR_date)b
+--	on a.DR_date=b.DR_date
+--	left join
+--					#TPreach c
+--	on a.DR_date=c.DR_date
+--	group by a.DR_date, a.FirstEntryTime, b.Stop_Out_Time, c.[TP_Reach_Time]
 
 
 /************************/
@@ -1075,3 +1203,5 @@ from #FirstM7GreenBroken
 union all
 Select DR_date,DR_Box,[session],M7_Broken
 from #FirstM7RedBroken
+
+
