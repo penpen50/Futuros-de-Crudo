@@ -1,4 +1,3 @@
-
 Select top 10 * from  [dbo].[CL_5min_IndividualCon] where TradingDatetime='2008-08-31 16:10:00.0000000'
 
 drop table if exists #tmp1
@@ -438,11 +437,11 @@ Select * from #tmp10 order by DR_date desc
 --All dates with no entry
 
 drop table if exists #tmp11
-Select DR_date,[session],Conf_Direction,
+Select DR_date,[session],Conf_Direction,[Box Color],
     cast(null as DateTime) as FirstEntryTime
 	into #tmp11
 from #tmp8 
-group by DR_date,[session],Conf_Direction
+group by DR_date,[session],Conf_Direction,[Box Color]
 having sum(Qualify_Entry_Time)=0
 
 
@@ -452,13 +451,13 @@ Select a.*,b.Stop_Out_Time,c.[TP_Reach_Time]
 	from #tmp11 a
 left join
 		(Select DR_date,[session],Conf_Direction,
-		cast(min(TradingDateTime) as Time) as [Stop_Out_Time]
+		cast(min(TradingDateTime) as DateTime) as [Stop_Out_Time]
 	from #tmp8
 		where [SL_hit]=1 group by DR_date,[session],Conf_Direction) b
 		on a.DR_date=b.DR_date and a.[session]=b.[session]
 left join
 		(Select DR_date,[session],
-		cast(min(TradingDateTime) as Time) as [TP_Reach_Time]
+		cast(min(TradingDateTime) as DateTime) as [TP_Reach_Time]
 	from #tmp8 
 		where [TP_hit]=1 group by DR_date,[session])c
 		on a.DR_date=c.DR_date and a.[session]=c.[session]
@@ -543,6 +542,8 @@ from #tmp15 a
 Select  * from #tmp16 order by DR_Date desc
 --need refine!!!!!!!!
 --Summarize the data
+
+drop table if exists #tmp17
 Select 
 	[Session],	
 	case format(DR_date,'ddd') 
@@ -573,6 +574,7 @@ group by
 
 	Select * from #tmp17 where DoW=7
 
+drop tabe if exists #tmp19
 	Select a.[Session], a.DoW,a.Outcome,a.Tradecount,b.DayswithEntry,a.RR
 	into #tmp19
 	from #tmp17 a
@@ -874,7 +876,7 @@ Select
 into #SDPlot
 from #tmp7
 
-Select *,floor(Candle_CloseSD*10)/10 as round_down_close from #SDPlot where [Session]='RDR' and [Box Color]='Green' and DR_Box='Other' order by TradingDateTime desc
+Select *,floor(Candle_Close_SD*10)/10 as round_down_close from #SDPlot where [Session]='RDR' and [Box Color]='Green' and DR_Box='Other' order by TradingDateTime desc
 
 Select * into #SDPlotsub from #SDPlot where [Session]='RDR' and [Box Color]='Green' and DR_Box='Other' order by TradingDateTime desc
 
@@ -980,13 +982,16 @@ group by DR_date
 drop table if exists #Mid03
 Select a.*,b.ADR_Mid,b.ODR_Mid,b.RDR_Mid,
 	case when a.Candle_Color = 'Red Candle' then a.[Open] else a.[Close] end as CandleCloseH,
-	case when a.Candle_Color = 'Red Candle' then a.[Close] else a.[Open] end as CandleCloseL,
+	case when a.Candle_Color = 'Red Candle' then a.[Close] else a.[Open] end as CandleCloseL
 into #Mid03 
 from #tmp7 a
 left join #Mid02 b
 on a.DR_Date=b.DR_Date
 
 --Find crossover time
+--'With' clause must run as a standalone block
+--cannot contain comments inside the block
+
 Drop table if exists #Broken01
 With ADRBrokenTimes as (
 	Select
@@ -997,7 +1002,7 @@ With ADRBrokenTimes as (
 		DR_Box,
 		row_number() over (partition by DR_date order by TradingDateTime) as row_num
 from #Mid03
-where (Timeonly between '02:00:00' and '18:00:00') and (ADR_Mid between [Low] and [High]
+where (Timeonly between '02:00:00' and '18:00:00') and (ADR_Mid between [Low] and [High])
 ), 
 FirstADRBrokenTime as (
 	Select 
@@ -1019,7 +1024,6 @@ ODRBrokenTimes as(
 		row_number() over(partition by DR_date order by TradingDateTime) as row_num
 from #Mid03
 where (Timeonly between '08:30:00' and '18:00:00') and (ODR_Mid between [Low] and [High])
-		--(ODR_Mid between CandleCloseL and CandleCloseH)
 ),
 FirstODRBrokenTime as (
 	Select 
@@ -1031,7 +1035,6 @@ FirstODRBrokenTime as (
 from ODRBrokenTimes 
 where row_num=1)
 
-/????????? Somehting missing
 Select a.DR_date,a.ADR_Broken, a.ADR_Broken_session,a.ADR_Broken_Box,
 		b.ODR_Broken, b.ODR_Broken_session,b.ODR_Broken_Box
 	into #Broken01
@@ -1040,15 +1043,71 @@ left join FirstODRBrokenTime b
 on a.DR_date=b.DR_date
 
 --Add broken info to dailyinfo dataset
+Select top 100 * from #Broken01
+
+drop table if exists #DailyInfo01_1
+
 Select a.*,b.DR_date,b.ADR_Broken, b.ADR_Broken_session,b.ADR_Broken_Box,
 		b.ODR_Broken, b.ODR_Broken_session,b.ODR_Broken_Box
-	into #DailyInfo01
+	into #DailyInfo01_1
 from #tmp6 a
 left join #Broken01 b          
 on a.DR_date=b.DR_date
 
-Select * from #DAilyInfo01 order by DR_dae desc
+Select top 100 * from #DailyInfo01_1 order by DR_date desc
 
+--Consolidate the broken columns
+Select
+	DR_date,
+	DoW,
+ [Session],
+	First_Conf_TradingDateTime,
+	First_Conf_Time,
+	Long_Conf_TradingDateTime,
+	Long_Conf_Time,
+	Short_Conf_TradingDateTime,
+	Short_Conf_Time,
+	Conf_Direction,
+	[TF Day],
+	[False DateTime],
+	[False Time],
+	[Box Color],
+	[Open],
+	[Close],
+	DR_High,
+	IDR_High,
+	DR_Low,
+	IDR_Low,
+	SD_Size,
+	SD_tick_Size,
+	SD0,
+	DR_High_SD,
+	DR_Low_SD,
+	M7Box_Open_SD,
+	M7Box_Close_SD,
+	BoxSD0,
+	M7Box_Color_Close_SD,
+	Raw_OpenSD,
+	Raw_CloseSD,
+	[SD-05],
+	FirstCandleConf,
+	M7BoxSize,
+	ADR_Broken,
+	ADR_Broken_session,
+	ADR_Broken_Box
+	case when ADR_Broken_Box is null then 'ADR_notBroken'
+		when ADR_Broken_Box='Other' then ADR_Broken_session
+		else ADR_Broken_Box end as ADR_Broken_Type,
+	ODR_Broken,
+	ODR_Broken_session,
+	ODR_Broken_Box,
+	case when ODR_Broken_Box is null then 'ODR_notBroken'
+		when ODR_Broken_Box='Other' then ODR_Broken_session
+		else ODR_Broken_Box end as ODR_Broken_Type
+into #DailyInfo01
+from #DailyInfo01_1
+
+Select top 100* from #DailyInfo01
 
 /********************/
 /********Model*******/
@@ -1108,23 +1167,25 @@ case when a.[session]='ADR' then f.IDR_Low
 
 into #Model03
 from #Model01 a
-left join #Model02b
+left join #Model02 b
 on a.DR_Date=b.DR_Date
 left join
 	(Select DR_date,RDR_Mid from #Model02) c
-on a.Dummydate=c.DRdate
+on a.Dummydate=c.DR_date
 left join
 	(Select DR_date,DR_High,DR_Low,IDR_High,IDR_Low,[SD-05] from #Model01 
 			where [Session]='ADR')d
 	on a.DR_date=d.DR_date
+left join
 (Select DR_date,DR_High,DR_Low,IDR_High,IDR_Low,[SD-05] from #Model01 
 			where [Session]='ODR')e
 	on a.DR_date=e.DR_date
+left join
 (Select DR_date,DR_High,DR_Low,IDR_High,IDR_Low,[SD-05] from #Model01 
 			where [Session]='RDR')f   --from RDR to ADR model, we need to use previous day RDR
 	on a.Dummydate=f.DR_date
 
-Select * from #Model03 order by DR_Date,[Session]
+Select top 100 * from #Model03 order by DR_Date,[Session]
 
 --Determine the different model
 drop table if exists #Model04
@@ -1146,10 +1207,12 @@ from #Model03 a
 Select * from #Model04 order by DR_Date,[Session]
 
 Select a.*,b.Model
+ into #DailyInfo02
 	from #DailyInfo01 a
 left join #Model04 b
 on a.[DR_Date]=b.[DR_Date] and a.[Session]=b.[Session] 
 
+--To calculate if there is a close above/below M7 box, can it still confirm into the direction of the box color
 --Has any close ever violated RBC box color
 --Find crossover time
 
@@ -1203,5 +1266,19 @@ from #FirstM7GreenBroken
 union all
 Select DR_date,DR_Box,[session],M7_Broken
 from #FirstM7RedBroken
+
+Select top 100* from #M7Broken01
+Select * from #DailyInfo02
+
+drop table if exissts #DailyInfo03
+Select a.*,b.M7_Broken,
+	case when b.M7_Broken is null then 'M7 not broken' else 'M7 broken' end as RBC_M7_Broken
+into #DailyInfo03
+from #DailyInfo02 a
+	left join #M7Broken01 b
+on a.DR_date=b.DR_date and a.[Session]=b.[Session]
+
+Select top 100* into #DailyInfo03
+
 
 
