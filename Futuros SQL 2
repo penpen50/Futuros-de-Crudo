@@ -381,23 +381,23 @@ where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and TradingDateTime>[Fi
 
 drop table if exists #tmp9
 
-Select a.DR_date,a.[session],a.Conf_Direction,
+Select a.DR_date,a.[session],a.Conf_Direction,a.[Box Color],
 	   a.FirstEntryTime,
 	   b.Stop_Out_Time
 into #tmp9
 from
-	(Select DR_date,[session],Conf_Direction,
+	(Select DR_date,[session],Conf_Direction,[Box Color],
 	    min(TradingDateTime) as FirstEntryTime
 		--cast(min(TradingDateTime) as Time) as FirstEntryTime
 	from #tmp8
 	where [Qualify_Entry_Time]=1
-	group by DR_date,[session],Conf_Direction)  a
+	group by DR_date,[session],Conf_Direction,[Box Color])  a
 left join
-	(Select DR_date,[session],
+	(Select DR_date,[session],[Box Color],
 	    min(TradingDateTime) as [Stop_Out_Time]
 		--cast(min(TradingDateTime) as Time) as [Stop_Out_Time]
 	from #tmp8
-	where [SL_hit]=1 group by DR_date,[session] ) b
+	where [SL_hit]=1 group by DR_date,[session],[Box Color] ) b
 on a.DR_date=b.DR_date and a.[Session]=b.[Session]
 order by DR_date desc
 
