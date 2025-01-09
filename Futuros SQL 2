@@ -1280,5 +1280,37 @@ on a.DR_date=b.DR_date and a.[Session]=b.[Session]
 
 Select top 100* into #DailyInfo03
 
+--by Color by confirmation
+drop table if exists #M7Box_violated1
+Select [Box color],Conf_Direction,RBC_M7_Broken, count(DR_Date) as [Days],
+	sum(count(DR_Date)) over (partition by8 [Box Color]) as Box_Color_Count
+into #M7Boxviolated1
+from #DailyInfo03
+where [Session]='RDR'
+group by [Box Color],Conf_Direction,RBC_M7_Broken
+
+--Calculate %
+Select [Box Color],Conf_Direction,RBC_M7_Broken,[Days],[Box_Color_Count]'
+	round((cast([Days] as float)/cast(Box_Color_Count] as float))*100,2) as [Result]
+from #M7Box_violated1
+
+
+--by Color by confirmation by DoW
+drop table if exists #M7Box_violated2
+Select [DoW],[Box color],Conf_Direction,RBC_M7_Broken, count(DR_Date) as [Days],
+	sum(count(DR_Date)) over (partition by [DoW],[Box Color]) as Box_Color_Count
+into #M7Boxviolated2
+from #DailyInfo03
+where [Session]='RDR'
+group by [DoW],[Box Color],Conf_Direction,RBC_M7_Broken
+
+--Calculate %
+Select [DoW],[Box Color],Conf_Direction,RBC_M7_Broken,[Days],[Box_Color_Count]
+	round((cast([Days] as float)/cast(Box_Color_Count] as float))*100,2) as [Result]
+from #M7Box_violated2
+
+
+
+
 
 
