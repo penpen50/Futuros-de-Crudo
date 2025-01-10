@@ -242,7 +242,11 @@ Select a.*,
 		when [Box Color] in ('Red') then IDR_Low 
 	end as [BoxSD0],
 
-	--Determine open and close by box color for RBC backtesting
+	--Determine open and close by box color for RBC backtesting  --2
+case when [Box Color] in ('Green') then convert(decimal(10,2),((IDR_High-[Open])*-0.1/SD_Size))
+		 when [Box Color] in ('Red') then convert(decimal(10,2),((IDR_Low-[Open])*0.1/SD_Size))
+	end as [M7Box_Color_Open_SD],
+
 	case when [Box Color] in ('Green') then convert(decimal(10,2),((IDR_High-[Close])*-0.1/SD_Size))
 		 when [Box Color] in ('Red') then convert(decimal(10,2),((IDR_Low-[Close])*0.1/SD_Size))
 	end as [M7Box_Color_Close_SD],
@@ -298,6 +302,7 @@ Select
 	M7Box_Open_SD,
 	M7Box_Close_SD,
 	BoxSD0,
+	M7Box_Color_Open_SD,
 	M7Box_Color_Close_SD,
 	Raw_OpenSD,
 	Raw_CloseSD,
@@ -333,10 +338,13 @@ Select a.*,
 	   b.M7Box_Open_SD,
 	   b.M7Box_Close_SD,
 	   b.BoxSD0,
+			 b.M7Box_Color_Open_SD, 
 	   b.[M7Box_Color_Close_SD],
 	   b.Raw_OpenSD,
 	   b.Raw_CloseSD,
 	   b.[SD-05]
+	   b.FirstCandleConf,
+			 b.M7BoxSize --2
 	into #tmp7
 	from #tmp2 a
 		left join #tmp6 b
@@ -869,10 +877,13 @@ Select
 	M7Box_Open_SD,	
 	M7Box_Close_SD, 
 	BoxSD0,
+ M7Box_Color_Open_SD,--2
 	M7Box_Color_Close_SD, 
 	Raw_OpenSD,
 	Raw_CloseSD,
-	[SD-05]
+	[SD-05],
+	FirstCandleConf,--2
+	M7BoxSize --2
 into #SDPlot
 from #tmp7
 
@@ -1086,6 +1097,7 @@ Select
 	M7Box_Open_SD,
 	M7Box_Close_SD,
 	BoxSD0,
+ M7Box_Color_Open_SD,--2
 	M7Box_Color_Close_SD,
 	Raw_OpenSD,
 	Raw_CloseSD,
