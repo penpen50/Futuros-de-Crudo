@@ -1393,6 +1393,53 @@ on a.DR_Date=b.DR_Date and a.[Session]=b.[Session]
 left join #M7_retracement c
 on a.DR_Date=c.DR_Date and a.[Session]=c.[Session]
 
+/**********************/
+--Determine the position of M7 Box
+--Raw_OpenSD and Raw_CloseSD will be use to determine the position
+--In raw sense, all box are assume to be green
+--Green Box: Raw Open SD is always smaller (below) Raw Close SD
+--Green box mid point = Open+(Close-Open)/2
+--Red Box: Raw Close SD is always smaller (below) then Raw Open SD
+--Red Box mid point=Close+(Open-Close)/2
+
+
+With Raw_Mid as (
+	Select a.*,
+		case 
+				when a.[Box Color]='Green' then a.Raw_OpenSD+((a.Raw_CloseSD-a.Raw_OpenSD)/2)
+				when a.[Box Color]='Red' then a.Raw_CloseSD+((a.Raw_OpenSD-a.Raw_CloseSD)/2)
+				when a.[Box Color]='Grey' then a.Raw_CloseSD
+		end as Raw_Mid_SD
+from #DailyInfo04 a
+)
+Select a.*,
+	case
+			when a.Raw_CloseSD=-0.5 or a.Raw_OpenSD=-0.5 then 'At 0.5'
+		 when a.[Box Color]='Green' and a.Raw_CloseSD>-0.5 and a.Raw_OpenSD<-0.5 then '0.5 between Box'
+			when a.[Box Color]='Red' and a.Raw_CloseSD<-0.5 and a.Raw_OpenSD>-0.5 then '0.5 between Box'
+			when a.[Box Color]='Green' and a.Raw_CloseSD<-0.5 then 'Below 0.5'
+			when a.[Box Color]='Red' and a.Raw_OpenSD<-0.5 then 'Below 0.5'
+	when a.[Box Color]='Green' and a.Raw_OpenSD>-0.5 then 'Above 0.5'
+			when a.[Box Color]='Red' and a.Raw_CloseSD>-0.5 then 'Above 0.5'
+when a.[Box Color]='Grey' and a.Raw_CloseSD<-0.5 then 'Below 0.5'
+			when a.[Box Color]='Red' and a.Raw_OpenSD>-0.5 then 'Above 0.5'
+end as [Box Position relative to 0.5],
+
+case
+	when a.Raw_Mid_SD>-0.4 then 'Upper'
+	when a.Raw_Mid_SD<-0.6 then 'Lower'
+else 'Middle'
+end as [Box Position]
+into #DailyInfo05
+from Raw_Mid a;
+
+
+
+
+
+		
+
+
 
 
 
