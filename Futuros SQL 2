@@ -1072,6 +1072,14 @@ Select
 	DR_date,
 	DoW,
  [Session],
+	Concat(
+			Floor((cast(left(convert(varchar,First_Conf_Time),2) as integer)*60+cast(substring(convert(varchar,First_Conf_Time),4,2) as integer))/15)*15/60,
+':',
+right(concat('0',floor((cast(left(convert(varchar,First_Conf_Time),2) as integer)*60+cast(substring(convert(varchar,First_Conf_Time),4,2) as integer))/15)*15%60),2),
+' - ',
+Floor((cast(left(convert(varchar,First_Conf_Time),2) as integer)*60+cast(substring(convert(varchar,First_Conf_Time),4,2) as integer)+15)/15)*15/60,
+':',
+right(concat('0',floor((cast(left(convert(varchar,First_Conf_Time),2) as integer)*60+cast(substring(convert(varchar,First_Conf_Time),4,2) as integer)+15)/15)*15%60),2) as Conf_bucket,
 	First_Conf_TradingDateTime,
 	First_Conf_Time,
 	Long_Conf_TradingDateTime,
@@ -1385,7 +1393,16 @@ Select a.*,b.TradingDateTime as [MaxExtDateTime],b.Timeonly as [MaxExtTimeonly],
 	when a.Conf_Direction in ('Short') then convert(decimal(10,2),((a.IDR_Low-b.max_ext)*0.1/a.SD_Size)) end as Max_Ext_SD,
 	c.TradingDateTime as [M7retDateTime],c.Timeonly as [M7retTimeonly],c.M7_retracement,
 	case when a.Conf_Direction in ('Long') then convert(decimal(10,2),((a.IDR_High-c.M7_retracement)*-0.1/a.SD_Size))
-	when a.Conf_Direction in ('Short') then convert(decimal(10,2),((a.IDR_Low-c.M7_retracement)*0.1/a.SD_Size)) end as M7_ret_SD
+	when a.Conf_Direction in ('Short') then convert(decimal(10,2),((a.IDR_Low-c.M7_retracement)*0.1/a.SD_Size)) end as M7_ret_SD,
+	case when a.Conf_Direction in ('Long') and M7_retracement<DR_High then 'Close below DR' --3
+						when a.Conf_Direction in ('Short') and M7_retracement>DR_Low then 'Close below DR'
+					when a.Conf_Direction in ('No Conf') then 'No Conf'
+else 'DR not broken' and as DR_Broken,
+
+case when a.Conf_Direction in ('Long') and M7_retracement<IDR_High then 'Close below IDR' --3
+						when a.Conf_Direction in ('Short') and M7_retracement>IDR_Low then 'Close below IDR'
+					when a.Conf_Direction in ('No Conf') then 'No Conf'
+else 'IDR not broken' and as IDR_Broken,
 into #DailyInfo04
 from #DailyInfo03 a
 left join #MaxExt1 b
