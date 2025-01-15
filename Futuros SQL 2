@@ -143,6 +143,9 @@ Select e.*, aaaa.First_Conf_TradingDateTime, aaaa.First_Conf_Time, bbbb.Long_Con
 	--tick and SD size
 	convert (decimal(10,3), (ff.IDR_High-ff.IDR_Low)/10) as SD_Size, --dollar value per SD
 	convert (decimal(10,2), (ff.IDR_High-ff.IDR_Low) *10) as SD_tick_Size
+--M7 Box tick Sizw
+convert (decimal(10,3), abs(ff.[Close]-ff.[Open])/10) as M7Box_SD_Size, --dollar value per SD
+	convert (decimal(10,2), abs(ff.[Close]-ff.[Open]) *10) as M7Box_SD_tick_Size
 into #tmp5
 from
 	(Select ee.DR_Date, ee.[Session]
@@ -303,7 +306,9 @@ Select
 	M7Box_Close_SD,
 	BoxSD0,
 	M7Box_Color_Open_SD,
-	M7Box_Color_Close_SD,
+	M7Box_Color_Close_SD,	
+	M7Box_SD_Size,
+	M7Box_SD_tick_Size,
 	Raw_OpenSD,
 	Raw_CloseSD,
 	[SD-05],
@@ -340,6 +345,8 @@ Select a.*,
 	   b.BoxSD0,
 			 b.M7Box_Color_Open_SD, 
 	   b.[M7Box_Color_Close_SD],
+    b.M7Box_SD_Size,
+			 b.M7Box_SD_tick_Size,
 	   b.Raw_OpenSD,
 	   b.Raw_CloseSD,
 	   b.[SD-05]
@@ -879,6 +886,8 @@ Select
 	BoxSD0,
  M7Box_Color_Open_SD,--2
 	M7Box_Color_Close_SD, 
+	M7Box_SD_Size,
+	M7Box_SD_tick_Size,
 	Raw_OpenSD,
 	Raw_CloseSD,
 	[SD-05],
@@ -1107,6 +1116,8 @@ right(concat('0',floor((cast(left(convert(varchar,First_Conf_Time),2) as integer
 	BoxSD0,
  M7Box_Color_Open_SD,--2
 	M7Box_Color_Close_SD,
+ M7Box_SD_Size,
+	M7Box_SD_tick_Size,
 	Raw_OpenSD,
 	Raw_CloseSD,
 	[SD-05],
@@ -1349,6 +1360,8 @@ Select DR_date,[Session],TradingDateTime,Timeonly,[Low] as max_ext,
 where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and Conf_Direction='Short'
 group by DR_date,[Session],TradingDateTime,Timeonly,[Low]
 
+drop table if exists #MaxExt1
+
 Select * 
 into #MaxExt1
 from #ExtLong where max_ext_rank=1
@@ -1356,6 +1369,7 @@ union all
 Select * from #ExtShort where max_ext_rank = 1
 
 --M7 retracement
+drop table if exists #tmp7_1
 Select a.*, b.TradingDateTime as [MaxExtDateTime],b.Timeonly as [MaxExtTimeonly], b.Max_ext
 into #tmp7_1
 from #tmp7 a
@@ -1449,6 +1463,65 @@ else 'Middle'
 end as [Box Position]
 into #DailyInfo05
 from Raw_Mid a;
+
+Select * from #DailyInfo05
+
+/*******************************/
+--RBC vs M7 box analysis --4
+
+drop table if exists #RBC_M7Box_ret_Green
+Select DR_date,[Session],TradingDateTime,Timeonly,[Low] as RBC_M7Box_retracement, First_Conf_TradingDateTime,
+	row_number() over(partition by [DR_Date],[Session] order by [Low] asc, TradingDateTime asc) as RBC_M7Box_retracement_rank
+	into #RBC_M7Box_ret_Green
+	from #tmp7_1
+where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and [Box Color]='Green' and TradingDateTime<First_Conf_TradingDateTime
+group by DR_date,[Session],TradingDateTime,Timeonly,[Low],First_Conf_TradingDateTime
+
+
+drop table if exists #RBC_M7Box_ret_Red
+Select DR_date,[Session],TradingDateTime,Timeonly,[High] as RBC_M7Box_retracement, First_Conf_TradingDateTime,
+	row_number() over(partition by [DR_Date],[Session] order by [High] desc, TradingDateTime asc) as RBC_M7Box_retracement_rank
+	into #RBC_M7Box_ret_Red
+	from #tmp7_1
+where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and [Box Color]='Red' and TradingDateTime<First_Conf_TradingDateTime
+group by DR_date,[Session],TradingDateTime,Timeonly,[High],First_Conf_TradingDateTime
+
+
+drop table if exists #RBC_M7Box_retracement
+Select *
+	into #RBC_M7Box_retracement
+	from #RBC_M7Box_ret_Green where RBC_M7Box_retracement_rank=1
+union all
+Select * from #RBC_M7Box_ret_Red where RBC_M7Box_retracement_rank=1
+
+Select top 100 * from #RBC_M7Box_retracement
+
+--Combine M7 retracement with max est with detail dataset
+
+drop table if exists #DailyInfo06
+Select a.*, b.TradingDateTime as [RBC_M7Box_Retracement_DateTime], b.Timeonly as [RBC_M7Box_Retracement_Time],
+	case when a.[Box Color] in ('Green') then convert(decimal(10,2),((a.[Close]-b.RBC_M7Box_retracement)*-0.1/a.M7Box_SD_Size))
+  when a.[Box Color] in ('Red') then convert(decimal(10,2),((a.[Close]-b.RBC_M7Box_retracement)*0.1/a.M7Box_SD_Size))
+end as RBC_M7Box_retracement_SD,
+
+case when a.[Box Color] in ('Green') and RBC_M7Box_retracement>=[Open] then 'RBC M7 Box not broken'
+when a.[Box Color] in ('Red') and RBC_M7Box_retracement<=[Open] then 'RBC M7 Box not broken'
+when a.[Box Color] in ('Grey') then 'No Box Color'
+else 'RBC M7 Box Broken' end as RBC_M7_Box_Broken,
+
+case when a.[Box Color] in ('Green') and RBC_M7Box_retracement>=[Close] then 'RBC stay outside M7 Box'
+when a.[Box Color] in ('Red') and RBC_M7Box_retracement<=[Close] then 'RBC stay outside M7 Box'
+when a.[Box Color] in ('Grey') then 'No Box Color'
+else 'RBC enter M7 Box' end as RBC_M7_Box_StayOut
+	into #DailyInfo06
+from #DailyInfo05 a
+left join #RBC_M7Box_retracement b
+on a.DR_Date=b.DR_Date and a.[Session]=b.[Session]
+
+
+
+
+
 
 
 
