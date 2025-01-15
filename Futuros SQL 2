@@ -27,11 +27,11 @@ Select b.*,
 	     when TimeOnly between '09:30' and '16:00' then 'RDR'
 		 when TimeOnly between '16:05' and '19:25' then 'RDR-ADR'
 		 when TimeOnly between '19:30' and '23:55' then 'ADR'
-else 'Something wrong' end as session,
- case 
+	else 'Something wrong' end as session,
+	case 
 		 when TimeOnly between '03:00' and '03:55' then 'ODR DR Box'
 		 when TimeOnly between '09:30' and '10:25' then 'RDR DR Box'
-   when TimeOnly between '19:30' and '20:25' then 'ADR DR Box'
+	     when TimeOnly between '19:30' and '20:25' then 'ADR DR Box'
 		 else 'Other' end as [DR_Box],
 	case when TimeOnly between '18:00' and '23:55' then dateadd(day,1,Dateonly) --between '19:30' and '23:55'
 		 else DateOnly end as [DR_date]
@@ -56,7 +56,7 @@ Select a.DR_Date, a.[Session], b.[Open], c.[Close], dd.DR_High, ee.IDR_High, dd.
 	into #tmp3
 	from #tmp2 a
 left join
---DR open price
+--DR open price ie M7 Box open price
 	(Select DR_Date, TimeOnly, [Session], [Open]
 		from #tmp2 where TimeOnly in ('19:30', '03:00', '09:30')) b
 	on a.DR_Date=b.DR_Date and a.[Session]=b.[Session]
@@ -82,7 +82,7 @@ left join
 where a.[Session] in ('ADR','ODR','RDR')
 group by a.DR_Date, a.[Session], b.[Open], c.[Close], dd.DR_High, ee.IDR_High, dd.DR_Low, ee.IDR_Low
 
-Select * from #tmp3 where DR_Date>='2024-11-01' order by DR_Date desc
+Select top 100* from #tmp3 where DR_Date>='2024-11-01' order by DR_Date desc
 
 --First close time above high during a session
 --Get all the close that is above or below the DR High or Low to determine L or S day
@@ -98,7 +98,7 @@ Select a.*,
 into #tmp4
 from #tmp2 a
 left join #tmp3 b
-on a.Dr_Date=b.DR_Date and a. [Session]=b. [Session]
+on a.DR_Date=b.DR_Date and a. [Session]=b. [Session]
 
 
 --Figure out confimation time
@@ -135,16 +135,16 @@ Select e.*, aaaa.First_Conf_TradingDateTime, aaaa.First_Conf_Time, bbbb.Long_Con
 
 	--DR Box Color
 	case 
-			when ff.[Close]>ff.[Open] then 'Green'
+		 when ff.[Close]>ff.[Open] then 'Green'
 		 when ff.[Close]<ff.[Open] then 'Red'
 		 else 'Grey' end as [Box Color],
-			ff.[Open], ff.[Close], ff.[DR_High], ff.[IDR_High], ff.[DR_Low], ff.[IDR_Low],
+		 ff.[Open], ff.[Close], ff.[DR_High], ff.[IDR_High], ff.[DR_Low], ff.[IDR_Low],
 
 	--tick and SD size
 	convert (decimal(10,3), (ff.IDR_High-ff.IDR_Low)/10) as SD_Size, --dollar value per SD
-	convert (decimal(10,2), (ff.IDR_High-ff.IDR_Low) *10) as SD_tick_Size
+	convert (decimal(10,2), (ff.IDR_High-ff.IDR_Low) *10) as SD_tick_Size,
 --M7 Box tick Sizw
-convert (decimal(10,3), abs(ff.[Close]-ff.[Open])/10) as M7Box_SD_Size, --dollar value per SD
+	convert (decimal(10,3), abs(ff.[Close]-ff.[Open])/10) as M7Box_SD_Size, --dollar value per SD
 	convert (decimal(10,2), abs(ff.[Close]-ff.[Open]) *10) as M7Box_SD_tick_Size
 into #tmp5
 from
@@ -191,7 +191,7 @@ left join
 
 Select * from #tmp5 where [Close] is null order by DR_Date
 
-Select * from #tmp3 where DR_Date='2008-01-18'
+Select top 100 * from #tmp3 where DR_Date='2008-01-18'
 
 --SELECT 
 --    COLUMN_NAME, 
@@ -246,7 +246,7 @@ Select a.*,
 	end as [BoxSD0],
 
 	--Determine open and close by box color for RBC backtesting  --2
-case when [Box Color] in ('Green') then convert(decimal(10,2),((IDR_High-[Open])*-0.1/SD_Size))
+	case when [Box Color] in ('Green') then convert(decimal(10,2),((IDR_High-[Open])*-0.1/SD_Size))
 		 when [Box Color] in ('Red') then convert(decimal(10,2),((IDR_Low-[Open])*0.1/SD_Size))
 	end as [M7Box_Color_Open_SD],
 
@@ -323,14 +323,14 @@ Select top 10* from #tmp6 where Dow=7
 --join original dataset with DR level
 drop table if exists #tmp7
 Select a.*,
-    b.First_Conf_TradingDateTime,
+	   b.First_Conf_TradingDateTime,
 	   b.First_Conf_Time,
 	   b.Conf_Direction,
 	   b.[TF Day],
 	   b.[False Time],
 	   b.[Box Color],
 	   b.[Open] as [SessionOpen],
-	   b.[Close] as [SessionClose],
+	   b.[Close] as [SessionClose],	
 	   b.DR_high,
 	   b.IDR_High,
 	   b.DR_low,
@@ -343,15 +343,15 @@ Select a.*,
 	   b.M7Box_Open_SD,
 	   b.M7Box_Close_SD,
 	   b.BoxSD0,
-			 b.M7Box_Color_Open_SD, 
+	   b.M7Box_Color_Open_SD, 
 	   b.[M7Box_Color_Close_SD],
-    b.M7Box_SD_Size,
-			 b.M7Box_SD_tick_Size,
+       b.M7Box_SD_Size,
+	   b.M7Box_SD_tick_Size,
 	   b.Raw_OpenSD,
 	   b.Raw_CloseSD,
-	   b.[SD-05]
+	   b.[SD-05],
 	   b.FirstCandleConf,
-			 b.M7BoxSize --2
+	   b.M7BoxSize --2
 	into #tmp7
 	from #tmp2 a
 		left join #tmp6 b
@@ -379,7 +379,7 @@ Select a.*,
 		case when [Low]<=([SD0]+(@SD_SL*10* [SD_Size])-(0.01*@plus_tick)) then 1 else 0 end as [SL_hit],
 		[SD0]+(@SD_Target*10*SD_Size) as [TP],
 		case when [High]>=([SD0]+(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
-	into #tmp8
+	into #tmp8_1
 	from #tmp7 a
 	where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and TradingDateTime>[First_Conf_TradingDateTime] and Conf_Direction in ('Long')
 	union all
@@ -393,6 +393,9 @@ Select a.*,
 from #tmp7 a
 where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and TradingDateTime>[First_Conf_TradingDateTime] and Conf_Direction in ('Short')
 
+--Choose date range
+drop table if exists #tmp8
+Select * into #tmp8 from #tmp8_1 where Dateonly>='2024-01-01'
 
 drop table if exists #tmp9
 
@@ -436,9 +439,6 @@ from #tmp8 c
 join #FirstEntry fe on c.DR_date=fe.DR_date and c.[session]=fe.[session] --inner join
 where [TP_hit]=1 and c.TradingDateTime>=fe.FirstEntryTime group by c.DR_date,c.[session]
 --where [TP_hit]=1 and c.Timeonly>=fe.FirstEntryTime group by c.DR_date,c.[session]
-
-
-
 --Select * from #TPreach order by Dateonly desc
 drop table if exists #tmp10
 Select a.* ,
@@ -589,8 +589,8 @@ group by
 
 	Select * from #tmp17 where DoW=7
 
-drop tabe if exists #tmp19
-	Select a.[Session], a.DoW,a.Outcome,a.Tradecount,b.DayswithEntry,a.RR
+drop table if exists #tmp19
+Select a.[Session], a.DoW,a.Outcome,a.Tradecount,b.DayswithEntry,a.RR
 	into #tmp19
 	from #tmp17 a
 	left join
@@ -602,14 +602,14 @@ drop tabe if exists #tmp19
 
 	Select * from #tmp19
 
-	Select a.[Session], a.DoW,a.Outcome,a.Tradecount,a.DayswithEntry,
+Select a.[Session], a.DoW,a.Outcome,a.Tradecount,a.DayswithEntry,a.RR,
 		case when a.DayswithEntry<>0 then 
 			round((cast(a.Tradecount as float)/a.DayswithEntry)*100,2)
 		else 0
 		end as WinPercentage
 	  -- (a.Tradecount/nullif(a.DayswithEntry,0)) as WinPercentage
 		--round(a.Tradecount/nullif(a.DayswithEntry,0)*100,2) as WinPercentage
-		from #tmp19 a
+from #tmp19 a
 
 
 --Select a.DR_date, a.FirstEntryTime,
@@ -831,24 +831,25 @@ from #tmp14
 Select * from #tmp15
 drop table if exists #tmp16
 Select a.*,
-	convert(decimal(10,2),case when [Outcome]='No Entry' then 0
-														 when [Outcome]='Fail' then -1
-              when [Outcome]='Success' then PotentialRR
-       								when [Outcome]='Exit' then (PL)/abs([Entry]-SL)
-	end) as [RR])
+	convert(decimal(10,2),case 
+		when [Outcome]='No Entry' then 0
+		when [Outcome]='Fail' then -1
+        when [Outcome]='Success' then PotentialRR
+		when [Outcome]='Exit' then (PL)/abs([Entry]-SL)
+	end) as [RR]
 into #tmp16
 from #tmp15 a
 
 Select * from #tmp16
 
-/**/
+/***************************************/
 /*Figure out original dataset by SD*/
 /*use #tmp7*/
 
 drop table if exists #SDPlot
 Select 
 	TradingDateTime,
-	Dateonly.
+	Dateonly,
 	Timeonly,
 	[Session],
 	DR_Box,
@@ -860,7 +861,7 @@ Select
 	--SD assume long direction. for short, just use 1-
 	convert(decimal(10,2),([Open]-[IDR_high])/-SD_Size*10) as [Candle_Open_SD],
 	convert(decimal(10,2),([High]-[IDR_high])/-SD_Size*10) as [Candle_High_SD],  
-  convert(decimal(10,2),([Low]-[IDR_high])/-SD_Size*10) as [Candle_Low_SD],                                  
+	convert(decimal(10,2),([Low]-[IDR_high])/-SD_Size*10) as [Candle_Low_SD],                                  
 	convert(decimal(10,2),([Close]-[IDR_high])/-SD_Size*10) as [Candle_Close_SD], 
 	Volume,
 	[Candle_Color],
@@ -884,7 +885,7 @@ Select
 	M7Box_Open_SD,	
 	M7Box_Close_SD, 
 	BoxSD0,
- M7Box_Color_Open_SD,--2
+	M7Box_Color_Open_SD,--2
 	M7Box_Color_Close_SD, 
 	M7Box_SD_Size,
 	M7Box_SD_tick_Size,
@@ -910,7 +911,7 @@ from #SDPlotsub
 --80 percentile
 Select Timeonly,	
 	min(Candle_Close_SD) as percentile_80_price
-into #80_percentile
+	into #80_percentile
 from #CTE
 where row_num>=0.8*total_count
 group by Timeonly
@@ -920,9 +921,9 @@ order by Timeonly
 drop table if exists #20_percentile
 Select Timeonly,
 	min(Candle_Close_SD) as percentile_20_price
-into #20_percentile
-from #CTE
-where row_num>=0.2*total_cont
+	into #20_percentile
+	from #CTE
+where row_num>=0.2*total_count
 group by Timeonly
 order by Timeonly
 
@@ -932,12 +933,12 @@ Select * from #20_percenile
 Select Timeonly,
 	Candle_Close_SD as mode_price
 into #Mode
-From (
+from (
 	Select
-			Timeonly,
-			Candle_Close_SD,
-	  count(*) as count,
-	  row_number() over (partition by Timeonly order by count(*) desc) as rn
+		Timeonly,
+		Candle_Close_SD,
+		count(*) as count,
+		row_number() over (partition by Timeonly order by count(*) desc) as rn
 	from #SDPlotsub
 group by Timeonly, Candle_Close_SD) subquery
 where rn=1
@@ -947,8 +948,8 @@ order by Timeonly;
 Select 
 	Timeonly,
 	avg(Candle_Close_SD) as median_SD
-into #MedianSD
-from #CTE
+	into #MedianSD
+	from #CTE
 where row_num in (
 	 (total_count+1)/2,
   (total_count+2)/2
@@ -966,7 +967,7 @@ group by Timeonly
 order by Timeonly
 
 --Join into 1 table
-Select a.*,b.median_SD,c.mode_price,d.percentile_20_price,e.percentile80_price
+Select a.*,b.median_SD,c.mode_price,d.percentile_20_price,e.percentile_80_price
 from #AverageSD a
 left join #MedianSD b
 on a.Timeonly=b.Timeonly
@@ -990,9 +991,9 @@ where [session] in ('ADR','ODR','RDR')
 group by DR_date,[session],[SD-05]
 
 Select DR_Date,
-	max(case when [session]='ADR' then [SD-05] else null end) as ADR_Mid,
- max(case when [session]='ODR' then [SD-05] else null end) as ODR_Mid,
- max(case when [session]='RDR' then [SD-05] else null end) as RDR_Mid
+	 max(case when [session]='ADR' then [SD-05] else null end) as ADR_Mid,
+	 max(case when [session]='ODR' then [SD-05] else null end) as ODR_Mid,
+	 max(case when [session]='RDR' then [SD-05] else null end) as RDR_Mid
 into #Mid02
 from #Mid01
 group by DR_date
@@ -1067,8 +1068,8 @@ Select top 100 * from #Broken01
 
 drop table if exists #DailyInfo01_1
 
-Select a.*,b.DR_date,b.ADR_Broken, b.ADR_Broken_session,b.ADR_Broken_Box,
-		b.ODR_Broken, b.ODR_Broken_session,b.ODR_Broken_Box
+Select a.*,b.ADR_Broken, b.ADR_Broken_session,b.ADR_Broken_Box,
+	   b.ODR_Broken, b.ODR_Broken_session,b.ODR_Broken_Box
 	into #DailyInfo01_1
 from #tmp6 a
 left join #Broken01 b          
@@ -1080,15 +1081,15 @@ Select top 100 * from #DailyInfo01_1 order by DR_date desc
 Select
 	DR_date,
 	DoW,
- [Session],
+	[Session],
 	Concat(
-			Floor((cast(left(convert(varchar,First_Conf_Time),2) as integer)*60+cast(substring(convert(varchar,First_Conf_Time),4,2) as integer))/15)*15/60,
-':',
-right(concat('0',floor((cast(left(convert(varchar,First_Conf_Time),2) as integer)*60+cast(substring(convert(varchar,First_Conf_Time),4,2) as integer))/15)*15%60),2),
-' - ',
-Floor((cast(left(convert(varchar,First_Conf_Time),2) as integer)*60+cast(substring(convert(varchar,First_Conf_Time),4,2) as integer)+15)/15)*15/60,
-':',
-right(concat('0',floor((cast(left(convert(varchar,First_Conf_Time),2) as integer)*60+cast(substring(convert(varchar,First_Conf_Time),4,2) as integer)+15)/15)*15%60),2) as Conf_bucket,
+		Floor((cast(left(convert(varchar,First_Conf_Time),2) as integer)*60+cast(substring(convert(varchar,First_Conf_Time),4,2) as integer))/15)*15/60,
+		':',
+		right(concat('0',floor((cast(left(convert(varchar,First_Conf_Time),2) as integer)*60+cast(substring(convert(varchar,First_Conf_Time),4,2) as integer))/15)*15%60),2),
+		' - ',
+		Floor((cast(left(convert(varchar,First_Conf_Time),2) as integer)*60+cast(substring(convert(varchar,First_Conf_Time),4,2) as integer)+15)/15)*15/60,
+		':',
+		right(concat('0',floor((cast(left(convert(varchar,First_Conf_Time),2) as integer)*60+cast(substring(convert(varchar,First_Conf_Time),4,2) as integer)+15)/15)*15%60),2)) as Conf_bucket,
 	First_Conf_TradingDateTime,
 	First_Conf_Time,
 	Long_Conf_TradingDateTime,
@@ -1114,9 +1115,9 @@ right(concat('0',floor((cast(left(convert(varchar,First_Conf_Time),2) as integer
 	M7Box_Open_SD,
 	M7Box_Close_SD,
 	BoxSD0,
- M7Box_Color_Open_SD,--2
+	M7Box_Color_Open_SD,--2
 	M7Box_Color_Close_SD,
- M7Box_SD_Size,
+	M7Box_SD_Size,
 	M7Box_SD_tick_Size,
 	Raw_OpenSD,
 	Raw_CloseSD,
@@ -1125,14 +1126,16 @@ right(concat('0',floor((cast(left(convert(varchar,First_Conf_Time),2) as integer
 	M7BoxSize,
 	ADR_Broken,
 	ADR_Broken_session,
-	ADR_Broken_Box
-	case when ADR_Broken_Box is null then 'ADR_notBroken'
+	ADR_Broken_Box,
+	case 
+		when ADR_Broken_Box is null then 'ADR_notBroken'
 		when ADR_Broken_Box='Other' then ADR_Broken_session
 		else ADR_Broken_Box end as ADR_Broken_Type,
 	ODR_Broken,
 	ODR_Broken_session,
 	ODR_Broken_Box,
-	case when ODR_Broken_Box is null then 'ODR_notBroken'
+	case 
+		when ODR_Broken_Box is null then 'ODR_notBroken'
 		when ODR_Broken_Box='Other' then ODR_Broken_session
 		else ODR_Broken_Box end as ODR_Broken_Type
 into #DailyInfo01
@@ -1145,9 +1148,10 @@ Select top 100* from #DailyInfo01
 
 drop table if exists #Model01
 Select DR_date, datename(weekday,DR_date) as day_of_week,
-	case when datename(weekday,DR_date)='Monday' then dateadd(day,-3,DR_date)
- 		else dateadd(day,-1,DR_date) end as Dummydate,
-	[Session],DR_High,DR_Low,IDR_High,IDR_Low,[SD-05]
+		case 
+			when datename(weekday,DR_date)='Monday' then dateadd(day,-3,DR_date)
+ 			else dateadd(day,-1,DR_date) end as Dummydate,
+		[Session],DR_High,DR_Low,IDR_High,IDR_Low,[SD-05]
 into #Model01
 from #DailyInfo01
 
@@ -1155,7 +1159,7 @@ Select top 100 * from #Model01 order by DR_Date
 drop table if exists #Model02
 Select DR_Date,datename(weekday,DR_date) as day_of_week,
 		max(case when [session]='ADR' then [SD-05] else NULL end) as ADR_Mid,
-  max(case when [session]='ODR' then [SD-05] else NULL end) as ODR_Mid,
+	    max(case when [session]='ODR' then [SD-05] else NULL end) as ODR_Mid,
 		max(case when [session]='RDR' then [SD-05] else NULL end) as RDR_Mid
 into #Model02
 from #Model01
@@ -1173,27 +1177,27 @@ Select a.DR_date, a.day_of_week, a.Dummydate,[Session],a.DR_High,a.DR_Low,
 	c.RDR_Mid as RDR_Mid_Previous_Day,
 	case when a.[session]='ADR' then c.RDR_Mid
 	     when a.[session]='ODR' then b.ADR_Mid
-			   when a.[session]='RDR' then b.ODR_Mid
+		 when a.[session]='RDR' then b.ODR_Mid
 	end as [Critical_Mid], 
 
 	case when a.[session]='ADR' then f.DR_High
 	     when a.[session]='ODR' then d.DR_High
-			   when a.[session]='RDR' then e.DR_High
+		 when a.[session]='RDR' then e.DR_High
 	end as [Critical_DR_High],
 
 	case when a.[session]='ADR' then f.DR_Low
 	     when a.[session]='ODR' then d.DR_Low
-			   when a.[session]='RDR' then e.DR_Low
+		 when a.[session]='RDR' then e.DR_Low
 	end as [Critical_DR_Low],
 	
-case when a.[session]='ADR' then f.IDR_High
+	case when a.[session]='ADR' then f.IDR_High
 	     when a.[session]='ODR' then d.IDR_High
-			   when a.[session]='RDR' then e.IDR_High
+		 when a.[session]='RDR' then e.IDR_High
 	end as [Critical_IDR_High],
 
-case when a.[session]='ADR' then f.IDR_Low
+	case when a.[session]='ADR' then f.IDR_Low
 	     when a.[session]='ODR' then d.IDR_Low
-			   when a.[session]='RDR' then e.IDR_Low
+		 when a.[session]='RDR' then e.IDR_Low
 	end as [Critical_IDR_Low]
 
 into #Model03
@@ -1204,16 +1208,19 @@ left join
 	(Select DR_date,RDR_Mid from #Model02) c
 on a.Dummydate=c.DR_date
 left join
-	(Select DR_date,DR_High,DR_Low,IDR_High,IDR_Low,[SD-05] from #Model01 
-			where [Session]='ADR')d
+	(Select DR_date,DR_High,DR_Low,IDR_High,IDR_Low,[SD-05] 
+		from #Model01 
+		where [Session]='ADR')d
 	on a.DR_date=d.DR_date
 left join
-(Select DR_date,DR_High,DR_Low,IDR_High,IDR_Low,[SD-05] from #Model01 
-			where [Session]='ODR')e
+(Select DR_date,DR_High,DR_Low,IDR_High,IDR_Low,[SD-05] 
+		from #Model01 
+		where [Session]='ODR')e
 	on a.DR_date=e.DR_date
 left join
-(Select DR_date,DR_High,DR_Low,IDR_High,IDR_Low,[SD-05] from #Model01 
-			where [Session]='RDR')f   --from RDR to ADR model, we need to use previous day RDR
+(Select DR_date,DR_High,DR_Low,IDR_High,IDR_Low,[SD-05] 
+		from #Model01 
+		where [Session]='RDR')f   --from RDR to ADR model, we need to use previous day RDR
 	on a.Dummydate=f.DR_date
 
 Select top 100 * from #Model03 order by DR_Date,[Session]
@@ -1221,24 +1228,23 @@ Select top 100 * from #Model03 order by DR_Date,[Session]
 --Determine the different model
 drop table if exists #Model04
 Select a.*,
-	case when [IDR_High]<=[Critical_IDR_Low] then 'DXP'
-						 when [IDR_High]<=[Critical_Mid] and [IDR_High]>[Critical_IDR_Low] then 'DX'
-							when [IDR_Low]>=[Critical_IDR_High] then 'UXP'
-						 when [IDR_Low]>=[Critical_Mid] and [IDR_Low]<[Critical_IDR_High] then 'UX'
-							when [IDR_High]>[Critical_IDR_High] and [IDR_Low]<[Critical_IDR_Low] then 'RX'
-							when [IDR_High]>=[Critical_IDR_High] and [IDR_Low]>[Critical_IDR_Low]
-													and [IDR_Low]<[Critical_Mid] then 'U'
-							when [IDR_Low]<=[Critical_IDR_Low] and [IDR_High]<[Critical_IDR_High]
-													and [IDR_High]>[Critical_Mid] then 'D'
-							when [IDR_High]<=[Critical_IDR_High] and [IDR_Low]>=[Critical_IDR_Low] then 'RC'
+	case 
+		when [IDR_High]<=[Critical_IDR_Low] then 'DXP'
+		when [IDR_High]<=[Critical_Mid] and [IDR_High]>[Critical_IDR_Low] then 'DX'
+		when [IDR_Low]>=[Critical_IDR_High] then 'UXP'
+		when [IDR_Low]>=[Critical_Mid] and [IDR_Low]<[Critical_IDR_High] then 'UX'
+		when [IDR_High]>[Critical_IDR_High] and [IDR_Low]<[Critical_IDR_Low] then 'RX'
+		when [IDR_High]>=[Critical_IDR_High] and [IDR_Low]>[Critical_IDR_Low] and [IDR_Low]<[Critical_Mid] then 'U'
+		when [IDR_Low]<=[Critical_IDR_Low] and [IDR_High]<[Critical_IDR_High] and [IDR_High]>[Critical_Mid] then 'D'
+		when [IDR_High]<=[Critical_IDR_High] and [IDR_Low]>=[Critical_IDR_Low] then 'RC'
 else 'NoModel' end as Model
 into #Model04
 from #Model03 a
 
-Select * from #Model04 order by DR_Date,[Session]
+Select top 100 * from #Model04 order by DR_Date,[Session]
 
 Select a.*,b.Model
- into #DailyInfo02
+	into #DailyInfo02
 	from #DailyInfo01 a
 left join #Model04 b
 on a.[DR_Date]=b.[DR_Date] and a.[Session]=b.[Session] 
@@ -1247,19 +1253,20 @@ on a.[DR_Date]=b.[DR_Date] and a.[Session]=b.[Session]
 --Has any close ever violated RBC box color
 --Find crossover time
 
-Drop table if exists #M7Broken01
 
+Drop table if exists #M7GreenBrokenTimes
 Select
 	DR_date,
 	TradingDateTime,
 	Timeonly,
-[session],
-DR_Box,
+	[session],
+	DR_Box,
 row_number() over (partition by DR_date,[Session] order by TradingDateTime) as row_num
 into #M7GreenBrokenTimes
 from #tmp7
 where (TradingDateTime<First_Conf_TradingDateTime) and [Session] in ('ADR','ODR','RDR') and DR_Box='Other' and [Box Color]='Green' and [Close]<[SessionOpen]
 
+Drop table if exists #FirstM7GreenBroken
 Select
 	DR_date,
 	TradingDateTime as M7_Brokendatetime,
@@ -1270,17 +1277,19 @@ into #FirstM7GreenBroken
 from #M7GreenBrokenTimes
 where row_num=1
 
+Drop table if exists #M7RedBrokenTimes
 Select
 	DR_date,
 	TradingDateTime,
 	Timeonly,
-[session],
-DR_Box,
-row_number() over (partition by DR_date,[Session] order by TradingDateTime) as row_num
+	[session],
+	DR_Box,
+	row_number() over (partition by DR_date,[Session] order by TradingDateTime) as row_num
 into #M7RedBrokenTimes
 from #tmp7
 where (TradingDateTime<First_Conf_TradingDateTime) and [Session] in ('ADR','ODR','RDR') and DR_Box='Other' and [Box Color]='Red' and [Close]>[SessionOpen]
 
+Drop table if exists #FirstM7RedBroken
 Select
 	DR_date,
 	TradingDateTime as M7_Brokendatetime,
@@ -1291,17 +1300,18 @@ into #FirstM7RedBroken
 from #M7RedBrokenTimes
 where row_num=1
 
+drop table if exists #M7Broken01
 Select DR_date,DR_Box,[session],M7_Broken
 	into #M7Broken01
-from #FirstM7GreenBroken
-union all
+	from #FirstM7GreenBroken
+	union all
 Select DR_date,DR_Box,[session],M7_Broken
 from #FirstM7RedBroken
 
 Select top 100* from #M7Broken01
 Select * from #DailyInfo02
 
-drop table if exissts #DailyInfo03
+drop table if exists #DailyInfo03
 Select a.*,b.M7_Broken,
 	case when b.M7_Broken is null then 'M7 not broken' else 'M7 broken' end as RBC_M7_Broken
 into #DailyInfo03
@@ -1309,20 +1319,21 @@ from #DailyInfo02 a
 	left join #M7Broken01 b
 on a.DR_date=b.DR_date and a.[Session]=b.[Session]
 
-Select top 100* into #DailyInfo03
+Select top 100* from #DailyInfo03
 
 --by Color by confirmation
 drop table if exists #M7Box_violated1
 Select [Box color],Conf_Direction,RBC_M7_Broken, count(DR_Date) as [Days],
-	sum(count(DR_Date)) over (partition by8 [Box Color]) as Box_Color_Count
-into #M7Boxviolated1
+	sum(count(DR_Date)) over (partition by [Box Color]) as Box_Color_Count
+into #M7Box_violated1
 from #DailyInfo03
 where [Session]='RDR'
 group by [Box Color],Conf_Direction,RBC_M7_Broken
 
+Select * from #M7Box_violated1
 --Calculate %
-Select [Box Color],Conf_Direction,RBC_M7_Broken,[Days],[Box_Color_Count]'
-	round((cast([Days] as float)/cast(Box_Color_Count] as float))*100,2) as [Result]
+Select [Box Color],Conf_Direction,RBC_M7_Broken,[Days],[Box_Color_Count],
+	ROUND(CAST([Days] AS FLOAT) / CAST([Box_Color_Count] AS FLOAT) * 100, 2) AS [Result]
 from #M7Box_violated1
 
 
@@ -1330,14 +1341,14 @@ from #M7Box_violated1
 drop table if exists #M7Box_violated2
 Select [DoW],[Box color],Conf_Direction,RBC_M7_Broken, count(DR_Date) as [Days],
 	sum(count(DR_Date)) over (partition by [DoW],[Box Color]) as Box_Color_Count
-into #M7Boxviolated2
+into #M7Box_violated2
 from #DailyInfo03
 where [Session]='RDR'
 group by [DoW],[Box Color],Conf_Direction,RBC_M7_Broken
 
 --Calculate %
-Select [DoW],[Box Color],Conf_Direction,RBC_M7_Broken,[Days],[Box_Color_Count]
-	round((cast([Days] as float)/cast(Box_Color_Count] as float))*100,2) as [Result]
+Select [DoW],[Box Color],Conf_Direction,RBC_M7_Broken,[Days],[Box_Color_Count],
+	ROUND(CAST([Days] AS FLOAT) / CAST([Box_Color_Count] AS FLOAT) * 100, 2) AS [Result]
 from #M7Box_violated2
 
 
@@ -1376,7 +1387,7 @@ from #tmp7 a
 left join #MaxExt1 b
 on a.DR_Date=b.DR_Date and a.[Session]=b.[Session]
 
-drop table if exists #M7retLong
+drop table if exists #M7ret_Long
 Select DR_date,[Session],TradingDateTime,Timeonly,[Low] as M7_retracement, First_Conf_TradingDateTime, [MaxExtDateTime],
 	row_number() over(partition by [DR_date],[Session] order by [Low] asc, TradingDateTime asc) as M7_retracement_rank
 	into #M7ret_Long
@@ -1385,7 +1396,7 @@ where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and Conf_Direction='Lon
 group by DR_date,[Session],TradingDateTime,Timeonly,[Low],First_Conf_TradingDateTime,[MaxExtDateTime]
 
 
-drop table if exists #M7retShort
+drop table if exists #M7ret_Short
 Select DR_date,[Session],TradingDateTime,Timeonly,[High] as M7_retracement, First_Conf_TradingDateTime, [MaxExtDateTime],
 	row_number() over(partition by [DR_date],[Session] order by [High] desc, TradingDateTime asc) as M7_retracement_rank
 	into #M7ret_Short
@@ -1393,9 +1404,10 @@ Select DR_date,[Session],TradingDateTime,Timeonly,[High] as M7_retracement, Firs
 where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and Conf_Direction='Short' and TradingDateTime between First_Conf_TradingDateTime and [MaxExtDateTime]
 group by DR_date,[Session],TradingDateTime,Timeonly,[High],First_Conf_TradingDateTime,[MaxExtDateTime]
 
+drop table if exists #M7_retracement
 Select * 
-into #M7_retracement
-from #M7ret_Long where M7_retracement_rank=1
+	into #M7_retracement
+	from #M7ret_Long where M7_retracement_rank=1
 union all
 Select * from #M7ret_Short where M7_retracement_rank=1
 
@@ -1406,17 +1418,19 @@ Select a.*,b.TradingDateTime as [MaxExtDateTime],b.Timeonly as [MaxExtTimeonly],
 	case when a.Conf_Direction in ('Long') then convert(decimal(10,2),((a.IDR_High-b.max_ext)*-0.1/a.SD_Size))
 	when a.Conf_Direction in ('Short') then convert(decimal(10,2),((a.IDR_Low-b.max_ext)*0.1/a.SD_Size)) end as Max_Ext_SD,
 	c.TradingDateTime as [M7retDateTime],c.Timeonly as [M7retTimeonly],c.M7_retracement,
-	case when a.Conf_Direction in ('Long') then convert(decimal(10,2),((a.IDR_High-c.M7_retracement)*-0.1/a.SD_Size))
-	when a.Conf_Direction in ('Short') then convert(decimal(10,2),((a.IDR_Low-c.M7_retracement)*0.1/a.SD_Size)) end as M7_ret_SD,
-	case when a.Conf_Direction in ('Long') and M7_retracement<DR_High then 'Close below DR' --3
-						when a.Conf_Direction in ('Short') and M7_retracement>DR_Low then 'Close below DR'
-					when a.Conf_Direction in ('No Conf') then 'No Conf'
-else 'DR not broken' and as DR_Broken,
+	case 
+		when a.Conf_Direction in ('Long') then convert(decimal(10,2),((a.IDR_High-c.M7_retracement)*-0.1/a.SD_Size))
+		when a.Conf_Direction in ('Short') then convert(decimal(10,2),((a.IDR_Low-c.M7_retracement)*0.1/a.SD_Size)) end as M7_ret_SD,
+	case 
+		when a.Conf_Direction in ('Long') and M7_retracement<DR_High then 'Close below DR' --3
+		when a.Conf_Direction in ('Short') and M7_retracement>DR_Low then 'Close below DR'
+		when a.Conf_Direction in ('No Conf') then 'No Conf'
+	else 'DR not broken' end as DR_Broken,
 
-case when a.Conf_Direction in ('Long') and M7_retracement<IDR_High then 'Close below IDR' --3
-						when a.Conf_Direction in ('Short') and M7_retracement>IDR_Low then 'Close below IDR'
-					when a.Conf_Direction in ('No Conf') then 'No Conf'
-else 'IDR not broken' and as IDR_Broken,
+	case when a.Conf_Direction in ('Long') and M7_retracement<IDR_High then 'Close below IDR' --3
+		 when a.Conf_Direction in ('Short') and M7_retracement>IDR_Low then 'Close below IDR'
+		 when a.Conf_Direction in ('No Conf') then 'No Conf'
+else 'IDR not broken' end as IDR_Broken
 into #DailyInfo04
 from #DailyInfo03 a
 left join #MaxExt1 b
@@ -1445,20 +1459,19 @@ from #DailyInfo04 a
 )
 Select a.*,
 	case
-			when a.Raw_CloseSD=-0.5 or a.Raw_OpenSD=-0.5 then 'At 0.5'
-		 when a.[Box Color]='Green' and a.Raw_CloseSD>-0.5 and a.Raw_OpenSD<-0.5 then '0.5 between Box'
-			when a.[Box Color]='Red' and a.Raw_CloseSD<-0.5 and a.Raw_OpenSD>-0.5 then '0.5 between Box'
-			when a.[Box Color]='Green' and a.Raw_CloseSD<-0.5 then 'Below 0.5'
-			when a.[Box Color]='Red' and a.Raw_OpenSD<-0.5 then 'Below 0.5'
-	when a.[Box Color]='Green' and a.Raw_OpenSD>-0.5 then 'Above 0.5'
-			when a.[Box Color]='Red' and a.Raw_CloseSD>-0.5 then 'Above 0.5'
-when a.[Box Color]='Grey' and a.Raw_CloseSD<-0.5 then 'Below 0.5'
-			when a.[Box Color]='Red' and a.Raw_OpenSD>-0.5 then 'Above 0.5'
-end as [Box Position relative to 0.5],
-
-case
-	when a.Raw_Mid_SD>-0.4 then 'Upper'
-	when a.Raw_Mid_SD<-0.6 then 'Lower'
+		when a.Raw_CloseSD=-0.5 or a.Raw_OpenSD=-0.5 then 'At 0.5'
+		when a.[Box Color]='Green' and a.Raw_CloseSD>-0.5 and a.Raw_OpenSD<-0.5 then '0.5 between Box'
+		when a.[Box Color]='Red' and a.Raw_CloseSD<-0.5 and a.Raw_OpenSD>-0.5 then '0.5 between Box'
+		when a.[Box Color]='Green' and a.Raw_CloseSD<-0.5 then 'Below 0.5'
+		when a.[Box Color]='Red' and a.Raw_OpenSD<-0.5 then 'Below 0.5'
+		when a.[Box Color]='Green' and a.Raw_OpenSD>-0.5 then 'Above 0.5'
+		when a.[Box Color]='Red' and a.Raw_CloseSD>-0.5 then 'Above 0.5'
+		when a.[Box Color]='Grey' and a.Raw_CloseSD<-0.5 then 'Below 0.5'
+		when a.[Box Color]='Red' and a.Raw_OpenSD>-0.5 then 'Above 0.5'
+	end as [Box Position relative to 0.5],
+	case
+		when a.Raw_Mid_SD>-0.4 then 'Upper'
+		when a.Raw_Mid_SD<-0.6 then 'Lower'
 else 'Middle'
 end as [Box Position]
 into #DailyInfo05
@@ -1500,26 +1513,29 @@ Select top 100 * from #RBC_M7Box_retracement
 
 drop table if exists #DailyInfo06
 Select a.*, b.TradingDateTime as [RBC_M7Box_Retracement_DateTime], b.Timeonly as [RBC_M7Box_Retracement_Time],
-	case when a.[Box Color] in ('Green') then convert(decimal(10,2),((a.[Close]-b.RBC_M7Box_retracement)*-0.1/a.M7Box_SD_Size))
-  when a.[Box Color] in ('Red') then convert(decimal(10,2),((a.[Close]-b.RBC_M7Box_retracement)*0.1/a.M7Box_SD_Size))
-end as RBC_M7Box_retracement_SD,
+	case 
+		when a.[Box Color] in ('Green') then convert(decimal(10,2),((a.[Close]-b.RBC_M7Box_retracement)*-0.1/a.M7Box_SD_Size))
+		when a.[Box Color] in ('Red') then convert(decimal(10,2),((a.[Close]-b.RBC_M7Box_retracement)*0.1/a.M7Box_SD_Size))
+	end as RBC_M7Box_retracement_SD,
 
-case when a.[Box Color] in ('Green') and RBC_M7Box_retracement>=[Open] then 'RBC M7 Box not broken'
-when a.[Box Color] in ('Red') and RBC_M7Box_retracement<=[Open] then 'RBC M7 Box not broken'
-when a.[Box Color] in ('Grey') then 'No Box Color'
-else 'RBC M7 Box Broken' end as RBC_M7_Box_Broken,
+	case 
+		when a.[Box Color] in ('Green') and RBC_M7Box_retracement>=[Open] then 'RBC M7 Box not broken'
+		when a.[Box Color] in ('Red') and RBC_M7Box_retracement<=[Open] then 'RBC M7 Box not broken'
+		when a.[Box Color] in ('Grey') then 'No Box Color'
+	else 'RBC M7 Box Broken' end as RBC_M7_Box_Broken,
 
-case when a.[Box Color] in ('Green') and RBC_M7Box_retracement>=[Close] then 'RBC stay outside M7 Box'
-when a.[Box Color] in ('Red') and RBC_M7Box_retracement<=[Close] then 'RBC stay outside M7 Box'
-when a.[Box Color] in ('Grey') then 'No Box Color'
-else 'RBC enter M7 Box' end as RBC_M7_Box_StayOut
+	case 
+		when a.[Box Color] in ('Green') and RBC_M7Box_retracement>=[Close] then 'RBC stay outside M7 Box'
+		when a.[Box Color] in ('Red') and RBC_M7Box_retracement<=[Close] then 'RBC stay outside M7 Box'
+		when a.[Box Color] in ('Grey') then 'No Box Color'
+	else 'RBC enter M7 Box' end as RBC_M7_Box_StayOut
 	into #DailyInfo06
 from #DailyInfo05 a
 left join #RBC_M7Box_retracement b
 on a.DR_Date=b.DR_Date and a.[Session]=b.[Session]
 
 
-
+Select * from #DailyInfo06 where [Session]='RDR' and DoW=3 and Conf_Direction='Long' and [Box Color]='Green'
 
 
 
@@ -1528,18 +1544,3 @@ on a.DR_Date=b.DR_Date and a.[Session]=b.[Session]
 
 
 		
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
