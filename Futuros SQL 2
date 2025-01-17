@@ -611,6 +611,14 @@ Select a.[Session], a.DoW,a.Outcome,a.Tradecount,a.DayswithEntry,a.RR,
 		--round(a.Tradecount/nullif(a.DayswithEntry,0)*100,2) as WinPercentage
 from #tmp19 a
 
+--5
+--Combine with M7 Box color close SD to find the best sent it entry
+
+Select a.*,b.DoW,b.M7BoxSixe,b.M7Box_Color_Close_SD
+from #tmp16 a
+left join #DailyInfo06 b
+on a.[DR_date]=b.[DR_date] and a.[Session]=b.[Session]
+
 
 --Select a.DR_date, a.FirstEntryTime,
 --	   b.Stop_Out_Time,
