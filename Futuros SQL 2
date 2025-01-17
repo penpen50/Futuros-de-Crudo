@@ -1583,6 +1583,137 @@ Floor(Raw_Mid_SD*10)/10 as Raw_Mid_SD_lower,
 Floor(Raw_OpenSD*10)/10+0.1 as Raw_OpenSD_upper,
 Floor(Raw_OpenSD*10)/10 as Raw_OpenSD_lower,
 
+Floor(RBC_M7Box_retracement_SD*10)/10+0.1 as RBC_M7Box_retracement_SD_upper,
+Floor(RBC_M7Box_retracement_SD*10)/10 as RBC_M7Box_retracement_SD_lower,
+
+from #DailyInfo06_1
+)
+
+Select
+[DR_Date],
+[DoW]'
+[Session],
+[Conf_bucket],
+left(convert(varchar,[First_Conf_TradingDateTime],120,16) as [First_Conf_TradingDateTime],
+left(convert(varchar,[First_Conf_Time],108),5) as [First_Conf_Time],
+
+left(convert(varchar,[Long_Conf_TradingDateTime],120,16) as [Long_Conf_TradingDateTime],
+left(convert(varchar,[Long_Conf_Time],108),5) as [Long_Conf_Time],
+
+left(convert(varchar,[Short_Conf_TradingDateTime],120,16) as [Short_Conf_TradingDateTime],
+left(convert(varchar,[Short_Conf_Time],108),5) as [Short_Conf_Time],
+
+[Conf_Direction],
+[TF Day],
+
+left(convert(varchar,[False DateTime],120,16) as [False DateTime],
+left(convert(varchar,[False Time],108),5) as [False Time],
+
+[Box Color],
+[Open],
+[Close],
+[DR_High],
+[IDR_High],
+[DR_Low],
+[IDR_Low],
+[SD_Size],
+[SD_tick_Size],
+[SD],
+[DR_High_SD],
+concat(format(DR_High_SD_lower,'0.00'),'  to ',format(DR_High_SD_upper,'0.00')) as [DR_High_SD_Range],
+[DR_Low_SD],
+
+concat(format(DR_Low_SD_lower,'0.00'),'  to ',format(DR_Low_SD_upper,'0.00')) as [DR_Low_SD_Range],
+
+[M7Box_Open_SD],
+concat(format(M7Box_Open_SD_lower,'0.00'),'  to ',format(M7Box_Open_SD_upper,'0.00')) as [M7Box_Open_SD_Range],
+
+[M7Box_Close_SD],
+concat(format(M7Box_Close_SD_lower,'0.00'),'  to ',format(M7Box_Close_SD_upper,'0.00')) as [M7Box_Close_SD_Range],
+
+[BoxSD0],
+
+[M7Box_Color_Open_SD],
+concat(format(M7Box_Color_Open_SD_lower,'0.00'),'  to ',format(M7Box_Color_Open_SD_upper,'0.00')) as [M7Box_Color_Open_SD_Range],
+
+[M7Box_Color_Close_SD],
+concat(format(M7Box_Color_Close_SD_lower,'0.00'),'  to ',format(M7Box_Color_Close_SD_upper,'0.00')) as [M7Box_Color_Close_SD_Range],
+
+[M7Box_SD_Size],
+[M7Box_SD_tick_Size],
+
+[Raw_OpenSD],
+concat(format(Raw_OpenSD_lower,'0.00'),'  to ',format(Raw_OpenSD_upper,'0.00')) as [Raw_OpenSD_Range],
+
+[Raw_CloseSD],
+concat(format(Raw_CloseSD_lower,'0.00'),'  to ',format(Raw_CloseSD_upper,'0.00')) as [Raw_CloseSD_Range],
+
+[SD-05],
+[FirstCandleConf],
+
+[M7BoxSize],
+concat(format(M7BoxSize_lower,'0.00'),'  to ',format(M7BoxSize_upper,'0.00')) as [M7BoxSize_Range],
+
+left(convert(varchar,[ADR_Broken],108),5) as [ADR_Broken],
+[ADR_Broken_session],
+[ADR_Broken_Box],
+[ADR_Broken_Type],
+
+left(convert(varchar,[ODR_Broken],108),5) as [ODR_Broken],
+[ODR_Broken_session],
+[ODR_Broken_Box],
+[ODR_Broken_Type],
+
+[Model],
+
+left(convert(varchar,[M7_Broken],108),5) as [M7_Broken],
+[RBC_M7_Broken],
+
+left(convert(varchar,[MaxExtDateTime],120),16) as [MaxExtDateTime],
+left(convert(varchar,[MaxExtTimeonly],108),5) as [MaxExtTimeonly],
+
+[max_ext],
+[Max_Ext_SD],
+
+concat(format(Max_Ext_SD_lower,'0.00'),'  to ',format(Max_Ext_SD_upper,'0.00')) as [Max_Ext_SD_Range],
+
+left(convert(varchar,[M7retDateTime],120),16) as [M7retDateTime],
+left(convert(varchar,[M7retTimeonly],108),5) as [M7retTimeonly],
+
+[M7_retracement],
+[M7_ret_SD],
+concat(format(M7_ret_SD_lower,'0.00'),'  to ',format(M7_ret_SD_upper,'0.00')) as [M7_ret_SD_Range],
+
+[DR_Broken],
+[IDR_Broken],
+format([Raw_Mid_SD],'0.00') as [Raw_Mid_SD],
+
+concat(format(Raw_Mid_SD_lower,'0.00'),'  to ',format(Raw_Mid_SD_upper,'0.00')) as [Raw_Mid_SD_Range],
+
+[Box Position Relative to 0.5],
+[Box Position],
+
+
+left(convert(varchar,[RBC_M7Box_Retracement_DateTime],120),16) as [RBC_M7Box_Retracement_DateTime],
+left(convert(varchar,[RBC_M7Box_Retracement_Time],108),5) as [RBC_M7Box_Retracement_Time],
+
+[RBC_M7Box_Retracement_SD],
+concat(format(RBC_M7Box_Retracement_SD_lower,'0.00'),'  to ',format(RBC_M7Box_Retracement_SD_upper,'0.00')) as [RBC_M7Box_Retracement_SD_Range],
+
+[RBC_M7_Box_Broken],
+[RBC_M7_Box_StayOut]
+into #DailyInfo06
+from Buckkets;
+
+
+
+
+
+
+
+
+
+
 
 
 
