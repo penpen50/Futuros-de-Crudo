@@ -1529,13 +1529,75 @@ Select a.*, b.TradingDateTime as [RBC_M7Box_Retracement_DateTime], b.Timeonly as
 		when a.[Box Color] in ('Red') and RBC_M7Box_retracement<=[Close] then 'RBC stay outside M7 Box'
 		when a.[Box Color] in ('Grey') then 'No Box Color'
 	else 'RBC enter M7 Box' end as RBC_M7_Box_StayOut
-	into #DailyInfo06
+	into #DailyInfo06_1
 from #DailyInfo05 a
 left join #RBC_M7Box_retracement b
 on a.DR_Date=b.DR_Date and a.[Session]=b.[Session]
 
 
 Select * from #DailyInfo06 where [Session]='RDR' and DoW=3 and Conf_Direction='Long' and [Box Color]='Green'
+
+Select top 100* from #DailyInfo06_1
+
+drop table if exists #DaiyInfo06
+
+With Buckets As(
+	Select
+		*,
+Floor(DR_High_SD*10)/10+0.1 as DR_High_SD_upper,
+Floor(DR_High_SD*10)/10 as DR_High_SD_lower,
+
+Floor(DR_Low_SD*10)/10+0.1 as DR_Low_SD_upper,
+Floor(DR_Low_SD*10)/10 as DR_Low_SD_lower,
+
+Floor(M7Box_Open_SD*10)/10+0.1 as M7Box_Open_SD_upper,
+Floor(M7Box_Open_SD*10)/10 as M7Box_Open_SD_lower,
+
+Floor(M7Box_Close_SD*10)/10+0.1 as M7Box_Close_SD_upper,
+Floor(M7Box_Close_SD*10)/10 as M7Box_Close_SD_lower,
+
+Floor(M7Box_Color_Open_SD*10)/10+0.1 as M7Box_Color_Open_SD_upper,
+Floor(M7Box_Color_Open_SD*10)/10 as M7Box_Color_Open_SD_lower,
+
+Floor(M7Box_Color_Close_SD*10)/10+0.1 as M7Box_Color_Close_SD_upper,
+Floor(M7Box_Color_Close_SD*10)/10 as M7Box_Color_Close_SD_lower,
+
+Floor(Raw_OpenSD*10)/10+0.1 as Raw_OpenSD_upper,
+Floor(Raw_OpenSD*10)/10 as Raw_OpenSD_lower,
+
+Floor(Raw_CloseSD*10)/10+0.1 as Raw_CloseSD_upper,
+Floor(Raw_CloseSD*10)/10 as Raw_CloseSD_lower,
+
+Floor(M7BoxSize*10)/10+0.1 as M7BoxSize_upper,
+Floor(M7BoxSize*10)/10 as M7BoxSize_lower,
+
+Floor(Max_Ext_SD*10)/10+0.1 as Max_Ext_SD_upper,
+Floor(Max_Ext_SD*10)/10 as Max_Ext_SD_lower,
+
+Floor(M7_ret_SD*10)/10+0.1 as M7_ret_SD_upper,
+Floor(M7_ret_SD*10)/10 as M7_ret_SD_lower,
+
+Floor(Raw_Mid_SD*10)/10+0.1 as Raw_Mid_SD_upper,
+Floor(Raw_Mid_SD*10)/10 as Raw_Mid_SD_lower,
+
+Floor(Raw_OpenSD*10)/10+0.1 as Raw_OpenSD_upper,
+Floor(Raw_OpenSD*10)/10 as Raw_OpenSD_lower,
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
