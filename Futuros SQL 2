@@ -1496,7 +1496,6 @@ Select DR_date,[Session],TradingDateTime,Timeonly,[Low] as RBC_M7Box_retracement
 where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and [Box Color]='Green' and TradingDateTime<First_Conf_TradingDateTime
 group by DR_date,[Session],TradingDateTime,Timeonly,[Low],First_Conf_TradingDateTime
 
-
 drop table if exists #RBC_M7Box_ret_Red
 Select DR_date,[Session],TradingDateTime,Timeonly,[High] as RBC_M7Box_retracement, First_Conf_TradingDateTime,
 	row_number() over(partition by [DR_Date],[Session] order by [High] desc, TradingDateTime asc) as RBC_M7Box_retracement_rank
@@ -1514,6 +1513,7 @@ union all
 Select * from #RBC_M7Box_ret_Red where RBC_M7Box_retracement_rank=1
 
 Select top 100 * from #RBC_M7Box_retracement
+
 
 /*******************************/
 --Inside M7 Box SD (Body Close) --6
@@ -1575,6 +1575,10 @@ into #DailyInfo06_1
 from #DailyInfo05 a
 left join #RBC_M7Box_retracement b
 on a.DR_Date=b.DR_Date and a.[Session]=b.[Session]
+left join #RBC_M7Box_Close_ret c
+on a.DR_Date=c.DR_Date and a.[Session]=c.[Session]
+
+
 
 
 Select * from #DailyInfo06 where [Session]='RDR' and DoW=3 and Conf_Direction='Long' and [Box Color]='Green'
@@ -1747,11 +1751,13 @@ Select
 
 	[RBC_M7Box_Broken],--6
 	[RBC_M7Box_Broken_Close],
-	[RBC_M7Box_CloseOutside
+	[RBC_M7Box_CloseOutside]
 into #DailyInfo06
 from Buckets;
 
 Select top 100 * from #DailyInfo06 order by DR_Date desc 
+
+
 
 --Summaries --6
 Select [Session],RBC_M7Box_Broken,RBC_M7Box_Broken_Close,
@@ -1767,8 +1773,3 @@ group by [Session],RBC_M7Box_Broken,RBC_M7Box_Broken_Close,Box_Color_match_Conf_
 Select [Session],[DoW],Conf_Direction,[M7Box_Color_Close_SD_Range],[Box_Color_Match_Conf_direction],count(DR_date)
 	from #DailyInfo06
 group by [Session],[DoW],Conf_Direction,[M7Box_Color_Close_SD_Range],[Box_Color_Match_Conf_direction]
-
-
-
-
-
