@@ -1564,7 +1564,7 @@ Select a.*, b.TradingDateTime as [RBC_M7Box_Retracement_DateTime], b.Timeonly as
 		when a.[Box Color] in ('Green') and c.RBC_M7Box_Close_ret>=[Open] then 'RBC M7Box not broken (Close)'
 		when a.[Box Color] in ('Red') and c.RBC_M7Box_Close_ret<=[Open] then 'RBC M7Box not broken (Close)'
 		when a.[Box Color] in ('Grey') then 'No Box Color'
-	else 'RBC enter M7Box Broken (Close)' end as RBC_M7Box_Broken_Close,
+	else 'RBC M7Box Broken (Close)' end as RBC_M7Box_Broken_Close,
 
 case 
 		when a.[Box Color] in ('Green') and c.RBC_M7Box_Close_ret>=[Close] then 'RBC always close outside M7Box'--6
@@ -1585,7 +1585,7 @@ Select * from #DailyInfo06 where [Session]='RDR' and DoW=3 and Conf_Direction='L
 
 Select top 100* from #DailyInfo06_1
 
-drop table if exists #DaiyInfo06
+drop table if exists #DailyInfo06
 
 With Buckets As(
 	Select
@@ -1756,8 +1756,8 @@ into #DailyInfo06
 from Buckets;
 
 Select top 100 * from #DailyInfo06 order by DR_Date desc 
-
-
+drop table if exists  Futures.dbo.CLDailyInfo
+Select * into Futures.dbo.CLDailyInfo from #DailyInfo06
 
 --Summaries --6
 Select [Session],RBC_M7Box_Broken,RBC_M7Box_Broken_Close,
