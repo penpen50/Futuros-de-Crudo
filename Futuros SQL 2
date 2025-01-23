@@ -327,7 +327,7 @@ Select a.*,
 	   b.First_Conf_Time,
 	   b.Conf_Direction,
 	   b.[TF Day],
-				b.[False DateTime], --8
+	   b.[False DateTime],
 	   b.[False Time],
 	   b.[Box Color],
 	   b.[Open] as [SessionOpen],
@@ -1361,6 +1361,8 @@ from #M7Box_violated2
 
 
 /***********************************/
+
+/***********************************/
 --Add max ext time before False confirmation  --8
 
 drop table if exists #ExtLong
@@ -1447,6 +1449,7 @@ drop table if exists #tmp_1
 Select a.*, b.TradingDateTime as [MaxExtDateTime],b.Timeonly as [MaxExtTimeonly],b.Max_ext
 	into #tmp7_1
 	from #tmp7 a
+	left join #MaxExt1 b
 on a.DR_Date=b.DR_Date and a.[Session]=b.[Session]
 
 drop table if exists #M7retLong
@@ -1516,9 +1519,6 @@ left join #MaxExtActual d
 on a.DR_Date=d.DR_Date and a.[Session]=d.[Session]
 left join #Max_ret e
 on a.DR_Date=e.DR_Date and a.[Session]=e.[Session]
-
-
-
 
 /**********************/
 --Determine the position of M7 Box
