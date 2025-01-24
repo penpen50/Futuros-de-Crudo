@@ -1624,7 +1624,11 @@ Select top 100* from #RBC_M7Box_Close_ret
 --Combine M7 retracement with max ext with detail dataset. M7 retracement category by both wick and close --6
 
 drop table if exists #DailyInfo06_1
-Select a.*, b.TradingDateTime as [RBC_M7Box_Retracement_DateTime], b.Timeonly as [RBC_M7Box_Retracement_Time],
+Select a.*, 
+((a.[DR_High]-a.[IDR_High])/a.SD_tick_Size)*10 as DR_High_thickness_SD, --9
+((a.[IDR_Low]-a.[DR_Low])/a.SD_tick_Size)*10 as DR_Low_thickness_SD, --9
+
+b.TradingDateTime as [RBC_M7Box_Retracement_DateTime], b.Timeonly as [RBC_M7Box_Retracement_Time],
 	case 
 		when a.[Box Color] in ('Green') then convert(decimal(10,2),((a.[Close]-b.RBC_M7Box_retracement)*-0.1/a.M7Box_SD_Size))
 		when a.[Box Color] in ('Red') then convert(decimal(10,2),((a.[Close]-b.RBC_M7Box_retracement)*0.1/a.M7Box_SD_Size))
@@ -1671,6 +1675,12 @@ With Buckets As(
 
 	Floor(DR_Low_SD*10)/10+0.1 as DR_Low_SD_upper,
 	Floor(DR_Low_SD*10)/10 as DR_Low_SD_lower,
+
+	Floor(DR_High_thickness_SD*10)/10+0.1 as DR_High_thickness_SD_upper,--9
+	Floor(DR_High_thickness_SD*10)/10 as DR_High_thickness_SD_lower,--9
+
+	Floor(DR_Low_thickness_SD*10)/10+0.1 as DR_Low_thickness_SD_upper,--9
+	Floor(DR_Low_thickness_SD*10)/10 as DR_Low_thickness_SD_lower,--9
 
 	Floor(M7Box_Open_SD*10)/10+0.1 as M7Box_Open_SD_upper,
 	Floor(M7Box_Open_SD*10)/10 as M7Box_Open_SD_lower,
@@ -1742,6 +1752,16 @@ Select
 	[IDR_High],
 	[DR_Low],
 	[IDR_Low],
+
+	format(DR_High_thickness_SD,'0.00') as DR_High_thickness_SD,--9
+concat(format(DR_High_thickness_SD_lower,'0.00'),'  to ',format(DR_High_thickness_SD_upper,'0.00')) as [DR_High_thickness_SD_Range],--9
+
+	format(DR_Low_thickness_SD,'0.00') as DR_Low_thickness_SD,--9
+concat(format(DR_Low_thickness_SD_lower,'0.00'),'  to ',format(DR_Low_thickness_SD_upper,'0.00')) as [DR_Low_thickness_SD_Range],--9
+
+
+
+
 	[SD_Size],
 	[SD_tick_Size],
 	[SD0],
