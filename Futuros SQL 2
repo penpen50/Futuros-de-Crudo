@@ -1432,7 +1432,7 @@ Select DR_date,[Session],TradingDateTime,Timeonly,[High] as max_ret, First_Conf_
 	row_number() over(partition by [DR_date],[Session] order by [High] desc, TradingDateTime asc) as max_retracement_rank
 	into #Max_ret_Short
 	from #tmp7
-where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and Conf_Direction='Long' and TradingDateTime>= First_Conf_TradingDateTime
+where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and Conf_Direction='Short' and TradingDateTime>= First_Conf_TradingDateTime
 group by DR_date,[Session],TradingDateTime,Timeonly,[High],First_Conf_TradingDateTime
 
 
