@@ -1720,6 +1720,9 @@ With Buckets As(
 	Floor(Max_Ext_SD*10)/10+0.1 as Max_Ext_SD_upper,
 	Floor(Max_Ext_SD*10)/10 as Max_Ext_SD_lower,
 
+	Floor(Max_Ret_SD*10)/10+0.1 as Max_Ret_SD_upper,
+	Floor(Max_Ret_SD*10)/10 as Max_Ret_SD_lower,
+
 	Floor(M7_ret_SD*10)/10+0.1 as M7_ret_SD_upper,
 	Floor(M7_ret_SD*10)/10 as M7_ret_SD_lower,
 
@@ -1824,6 +1827,13 @@ Select
 
 	left(convert(varchar,[M7_Broken],108),5) as [M7_Broken],
 	[RBC_M7_Broken],
+
+	left(convert(varchar,[MaxRetDateTime],120),16) as [MaxRetDateTime],
+	left(convert(varchar,[MaxRetTimeonly],108),5) as [MaxRetTimeonly],
+	[Max_Ret],
+	[Max_Ret_SD],
+	concat(format(Max_Ret_SD_lower,'0.00'),'  to ',format(Max_Ret_SD_upper,'0.00')) as [Max_Ret_SD_Range],
+
 
 	left(convert(varchar,[MaxExtDateTime],120),16) as [MaxExtDateTime],
 	left(convert(varchar,[MaxExtTimeonly],108),5) as [MaxExtTimeonly],
