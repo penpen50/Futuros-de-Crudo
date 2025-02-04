@@ -108,6 +108,7 @@ on a.DR_Date=b.DR_Date and a. [Session]=b. [Session]
 Select * from #tmp4
 
 drop table if exists #tmp5
+Select * from #tmp5 where [Conf_Direction]='No Conf' order by DR_Date desc
 
 Select e.*, aaaa.First_Conf_TradingDateTime, aaaa.First_Conf_Time, bbbb.Long_Conf_TradingDateTime, bbbb.Long_Conf_Time,
 	cccc.Short_Conf_TradingDateTime, cccc.Short_Conf_Time,
@@ -905,7 +906,7 @@ Select
 into #SDPlot
 from #tmp7
 
-Select *,floor(Candle_Close_SD*10)/10 as round_down_close from #SDPlot where [Session]='RDR' and [Box Color]='Green' and DR_Box='Other' order by TradingDateTime desc
+--Select *,floor(Candle_Close_SD*10)/10 as round_down_close from #SDPlot where [Session]='RDR' and [Box Color]='Green' and DR_Box='Other' order by TradingDateTime desc
 
 drop table if exists #SDPlotsub
 Select * into #SDPlotsub from #SDPlot where [Session]='RDR' and [Box Color]='Green' and DR_Box='Other' order by TradingDateTime desc
@@ -1376,31 +1377,31 @@ from #M7Box_violated2
 /***********************************/
 --Add max ext time before False confirmation  --8
 
-drop table if exists #ExtLong
-Select DR_date,[Session],TradingDateTime,Timeonly,[High] as max_ext,
-	row_number() over(partition by [DR_date],[Session] order by [high] desc, TradingDateTime asc) as max_ext_rank
-	into #ExtLong
+drop table if exists #M7ExtLong
+Select DR_date,[Session],TradingDateTime,Timeonly,[High] as M7_ext,
+	row_number() over(partition by [DR_date],[Session] order by [high] desc, TradingDateTime asc) as M7_ext_rank
+	into #M7ExtLong
 	from #tmp7
 where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and Conf_Direction='Long' and TradingDateTime>=First_Conf_TradingDateTime  --8
 	and ([TF Day]='T' or ([TF Day]='F' and TradingDateTime<[False DateTime]))
 group by DR_date,[Session],TradingDateTime,Timeonly,[High]
 
-drop table if exists #ExtShort
-Select DR_date,[Session],TradingDateTime,Timeonly,[Low] as max_ext,
-	row_number() over(partition by [DR_date],[Session] order by [Low] asc, TradingDateTime asc) as max_ext_rank
-	into #ExtShort
+drop table if exists #M7ExtShort
+Select DR_date,[Session],TradingDateTime,Timeonly,[Low] as M7_ext,
+	row_number() over(partition by [DR_date],[Session] order by [Low] asc, TradingDateTime asc) as M7_ext_rank
+	into #M7ExtShort
 	from #tmp7
 where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and Conf_Direction='Short' and TradingDateTime>=First_Conf_TradingDateTime  --8
 	and ([TF Day]='T' or ([TF Day]='F' and TradingDateTime<[False DateTime]))
 group by DR_date,[Session],TradingDateTime,Timeonly,[Low]
 
-drop table if exists #MaxExt1
+drop table if exists #M7Ext1
 
 Select * 
-into #MaxExt1
-from #ExtLong where max_ext_rank=1
+into #M7Ext1
+from #M7ExtLong where M7_ext_rank=1
 union all
-Select * from #ExtShort where max_ext_rank = 1
+Select * from #M7ExtShort where M7_ext_rank = 1
 
 --Actual Max Extension  --8
 drop table if exists #ExtLongActual
@@ -1454,34 +1455,34 @@ Select *
 union all
 Select * from #Max_ret_Short where max_retracement_rank=1
 
---M7 retracement before False confirmation
+--M7 retracement before False confirmation (M7ext)
 
 drop table if exists #tmp7_1
-Select a.*, b.TradingDateTime as [MaxExtDateTime],b.Timeonly as [MaxExtTimeonly],b.Max_ext
+Select a.*, b.TradingDateTime as [M7ExtDateTime],b.Timeonly as [M7ExtTimeonly],b.M7_ext
 	into #tmp7_1
 	from #tmp7 a
-	left join #MaxExt1 b
+	left join #M7Ext1 b
 on a.DR_Date=b.DR_Date and a.[Session]=b.[Session]
 
 drop table if exists #M7ret_Long
 
-Select DR_date,[Session],TradingDateTime,Timeonly,[Low] as M7_retracement, First_Conf_TradingDateTime, [MaxExtDateTime],
+Select DR_date,[Session],TradingDateTime,Timeonly,[Low] as M7_retracement, First_Conf_TradingDateTime, [M7ExtDateTime],
 	row_number() over(partition by [DR_date],[Session] order by [Low] desc, TradingDateTime asc) as M7_retracement_rank
 	into #M7ret_Long
 	from #tmp7_1
-where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and Conf_Direction='Long' and TradingDateTime between First_Conf_TradingDateTime and [MaxExtDateTime]
+where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and Conf_Direction='Long' and TradingDateTime between First_Conf_TradingDateTime and [M7ExtDateTime]
 	and ([TF Day]='T' or ([TF Day]='F' and TradingDateTime<[False DateTime]))
-group by DR_date,[Session],TradingDateTime,Timeonly,[Low],First_Conf_TradingDateTime,[MaxExtDateTime]
+group by DR_date,[Session],TradingDateTime,Timeonly,[Low],First_Conf_TradingDateTime,[M7ExtDateTime]
 
 
 drop table if exists #M7ret_Short
-Select DR_date,[Session],TradingDateTime,Timeonly,[High] as M7_retracement, First_Conf_TradingDateTime, [MaxExtDateTime],
+Select DR_date,[Session],TradingDateTime,Timeonly,[High] as M7_retracement, First_Conf_TradingDateTime, [M7ExtDateTime],
 	row_number() over(partition by [DR_date],[Session] order by [High] desc, TradingDateTime asc) as M7_retracement_rank
 	into #M7ret_Short
 	from #tmp7_1
-where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and Conf_Direction='Short' and TradingDateTime between First_Conf_TradingDateTime and [MaxExtDateTime]
+where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and Conf_Direction='Short' and TradingDateTime between First_Conf_TradingDateTime and [M7ExtDateTime]
 	and ([TF Day]='T' or ([TF Day]='F' and TradingDateTime<[False DateTime]))
-group by DR_date,[Session],TradingDateTime,Timeonly,[High],First_Conf_TradingDateTime,[MaxExtDateTime]
+group by DR_date,[Session],TradingDateTime,Timeonly,[High],First_Conf_TradingDateTime,[M7ExtDateTime]
 
 drop table if exists #M7_retracement
 Select * 
@@ -1494,9 +1495,9 @@ Select * from #M7ret_Short where M7_retracement_rank=1
 
 drop table if exists #DailyInfo04
 
-Select a.*,b.TradingDateTime as [MaxExtDateTime],b.Timeonly as [MaxExtTimeonly], b.max_ext,
-	case when a.Conf_Direction in ('Long') then convert(decimal(10,2),((a.IDR_High-b.max_ext)*-0.1/a.SD_Size))
-			when a.Conf_Direction in ('Short') then convert(decimal(10,2),((a.IDR_Low-b.max_ext)*0.1/a.SD_Size)) end as Max_Ext_SD,
+Select a.*,b.TradingDateTime as [M7ExtDateTime],b.Timeonly as [M7ExtTimeonly], b.M7_ext,
+	case when a.Conf_Direction in ('Long') then convert(decimal(10,2),((a.IDR_High-b.M7_ext)*-0.1/a.SD_Size))
+			when a.Conf_Direction in ('Short') then convert(decimal(10,2),((a.IDR_Low-b.M7_ext)*0.1/a.SD_Size)) end as M7_Ext_SD,
 	c.TradingDateTime as [M7retDateTime],c.Timeonly as [M7retTimeonly],c.M7_retracement,
 	case 
 		when a.Conf_Direction in ('Long') then convert(decimal(10,2),((a.IDR_High-c.M7_retracement)*-0.1/a.SD_Size))
@@ -1524,7 +1525,7 @@ Select a.*,b.TradingDateTime as [MaxExtDateTime],b.Timeonly as [MaxExtTimeonly],
 	else 'IDR not broken' end as IDR_Broken
 into #DailyInfo04
 from #DailyInfo03 a
-left join #MaxExt1 b
+left join #M7Ext1 b
 on a.DR_Date=b.DR_Date and a.[Session]=b.[Session]
 left join #M7_retracement c
 on a.DR_Date=c.DR_Date and a.[Session]=c.[Session]
@@ -1717,14 +1718,19 @@ With Buckets As(
 	Floor(M7BoxSize*10)/10+0.1 as M7BoxSize_upper,
 	Floor(M7BoxSize*10)/10 as M7BoxSize_lower,
 
-	Floor(Max_Ext_SD*10)/10+0.1 as Max_Ext_SD_upper,
-	Floor(Max_Ext_SD*10)/10 as Max_Ext_SD_lower,
+	Floor(M7_Ext_SD*10)/10+0.1 as M7_Ext_SD_upper,
+	Floor(M7_Ext_SD*10)/10 as M7_Ext_SD_lower,
+
+	Floor(M7_ret_SD*10)/10+0.1 as M7_ret_SD_upper,
+	Floor(M7_ret_SD*10)/10 as M7_ret_SD_lower,
+
+	Floor(Actual_Max_Ext_SD*10)/10+0.1 as  Actual_Max_Ext_SD_upper,
+	Floor(Actual_Max_Ext_SD*10)/10 as Actual_Max_Ext_SD_lower,
 
 	Floor(Max_Ret_SD*10)/10+0.1 as Max_Ret_SD_upper,
 	Floor(Max_Ret_SD*10)/10 as Max_Ret_SD_lower,
 
-	Floor(M7_ret_SD*10)/10+0.1 as M7_ret_SD_upper,
-	Floor(M7_ret_SD*10)/10 as M7_ret_SD_lower,
+
 
 	Floor(Raw_Mid_SD*10)/10+0.1 as Raw_Mid_SD_upper,
 	Floor(Raw_Mid_SD*10)/10 as Raw_Mid_SD_lower,
@@ -1835,20 +1841,27 @@ Select
 	concat(format(Max_Ret_SD_lower,'0.00'),'  to ',format(Max_Ret_SD_upper,'0.00')) as [Max_Ret_SD_Range],
 
 
-	left(convert(varchar,[MaxExtDateTime],120),16) as [MaxExtDateTime],
-	left(convert(varchar,[MaxExtTimeonly],108),5) as [MaxExtTimeonly],
+	left(convert(varchar,[M7ExtDateTime],120),16) as [M7ExtDateTime],
+	left(convert(varchar,[M7ExtTimeonly],108),5) as [M7ExtTimeonly],
+	[M7_ext],
+	[M7_Ext_SD],
+	concat(format(M7_Ext_SD_lower,'0.00'),'  to ',format(M7_Ext_SD_upper,'0.00')) as [M7_Ext_SD_Range],
 
-	[max_ext],
-	[Max_Ext_SD],
 
-	concat(format(Max_Ext_SD_lower,'0.00'),'  to ',format(Max_Ext_SD_upper,'0.00')) as [Max_Ext_SD_Range],
 
 	left(convert(varchar,[M7retDateTime],120),16) as [M7retDateTime],
 	left(convert(varchar,[M7retTimeonly],108),5) as [M7retTimeonly],
-
 	[M7_retracement],
 	[M7_ret_SD],
 	concat(format(M7_ret_SD_lower,'0.00'),'  to ',format(M7_ret_SD_upper,'0.00')) as [M7_ret_SD_Range],
+
+
+
+	left(convert(varchar,[actual_MaxExtDateTime],120),16) as [Actual_MaxExtDateTime],
+	left(convert(varchar,[actual_MaxExtTimeonly],108),5) as [Actual_MaxExtTimeonly],
+	[Actual_Max_ext],
+	[Actual_Max_Ext_SD],
+	concat(format(Actual_Max_Ext_SD_lower,'0.00'),'  to ',format(Actual_Max_Ext_SD_upper,'0.00')) as [Actual_Max_Ext_SD_Range],
 
 	[DR_Broken],
 	[IDR_Broken],
