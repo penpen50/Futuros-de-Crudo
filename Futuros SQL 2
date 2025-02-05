@@ -108,7 +108,6 @@ on a.DR_Date=b.DR_Date and a. [Session]=b. [Session]
 Select * from #tmp4
 
 drop table if exists #tmp5
-Select * from #tmp5 where [Conf_Direction]='No Conf' order by DR_Date desc
 
 Select e.*, aaaa.First_Conf_TradingDateTime, aaaa.First_Conf_Time, bbbb.Long_Conf_TradingDateTime, bbbb.Long_Conf_Time,
 	cccc.Short_Conf_TradingDateTime, cccc.Short_Conf_Time,
@@ -365,7 +364,7 @@ Select * from #tmp6 where DR_date='2024-12-16'
 
 /************Backtesting************/
 --Testing sucess rate at DR entry
-drop table if exists #tmp8
+drop table if exists #tmp8_1
 
 Declare @SD_Target decimal(4,2);
 Declare @SD_SL decimal(4,2);
@@ -394,10 +393,11 @@ Select a.*,
 	case when [Low]<= ([SD0]-(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
 from #tmp7 a
 where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and TradingDateTime>[First_Conf_TradingDateTime] and Conf_Direction in ('Short')
+
 --Continue to part always same
 
 /*Backtest by Retirement setup*/
-
+drop table if exists #tmp8_1
 Declare @SD_Target decimal(4,2);
 Declare @plus_tick decimal(4,2);
 Declare @Entry decimal(4,2);
@@ -428,13 +428,8 @@ where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and TradingDateTime>[Fi
 
 --Part always same
 
-
-
-
-
-
-
-/*Backtest by Entry by modifying SD*/
+/***BackTest by SD **/
+drop table if exists #tmp8_1
 
 Declare @SD_Target decimal(4,2);
 Declare @SD_SL decimal(4,2);
@@ -443,7 +438,7 @@ Declare @Entry decimal(4,2);
 set @SD_Target=1.5;
 set @SD_SL=-0.5;  --Change as needed
 set @plus_tick=3;
-set @Entry=-0.2  --Change as needed
+set @Entry=0  --Change as needed
 
 Select a.*,
 		[SD0]+(@Entry*10* [SD_Size]) as [Entry],
@@ -457,8 +452,8 @@ Select a.*,
 	where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and TradingDateTime>[First_Conf_TradingDateTime] and Conf_Direction in ('Long')
 	union all
 Select a.*,
-	[SD0] - (@SD_SL*10* [SD_Size]) as [Entry],
-	case when [SD0] - (@SD_SL*10* [SD_Size]) between [Low] and [High] then 1 else 0 end as [Qualify_Entry_Time],
+	[SD0] - (@Entry* [SD_Size]) as [Entry],
+	case when [SD0] - (@Entry * 10* [SD_Size]) between [Low] and [High] then 1 else 0 end as [Qualify_Entry_Time],
 	[SD0] - (@SD_SL*10* [SD_Size])+(0.01*@plus_tick) as [SL],
 	case when [High]>=([SD0]-(@SD_SL*10* [SD_Size])+(0.01*@plus_tick)) then 1 else 0 end as [SL_hit],
 	[SD0]-(@SD_Target*10*SD_Size) as [TP],
@@ -467,10 +462,13 @@ from #tmp7 a
 where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and TradingDateTime>[First_Conf_TradingDateTime] and Conf_Direction in ('Short')
 
 --Part always same
---Choose date range 
-drop table if exists #tmp8
-Select * into #tmp8 from #tmp8_1 where Dateonly>='2024-01-01'
 
+
+
+/***!!Part always same!!***/
+--Choose date range
+drop table if exists #tmp8
+Select * into #tmp8 from #tmp8_1 
 drop table if exists #tmp9
 
 Select a.DR_date,a.[session],a.Conf_Direction,a.[Box Color],
@@ -575,16 +573,40 @@ from #Result a
 order by DR_date desc
 
 --Join with entry, SL and TP
-drop table if exists #tmp14
-Select a.*,b.[Entry],b.[SL],b.[TP],b.[SessionClosePrice]
-	into #tmp14
-	from #tmp13 a
-	left join
-			(Select DR_date,[session],[Entry],SL,TP,[Close] as [SessionClosePrice] 
-						from #tmp8
-where Timeonly in ('01:55:00','08:25:00','15:55:00')
-group by DR_date,[session],[Entry],SL,TP,[Close])b
-on a.DR_date=b.DR_date and a.[session]=b.[session]
+--drop table if exists #tmp14
+--Select a.*,b.[Entry],b.[SL],b.[TP],b.[SessionClosePrice]
+--	into #tmp14
+--	from #tmp13 a
+--	left join
+--			(Select DR_date,[session],[Entry],SL,TP,[Close] as [SessionClosePrice] 
+--						from #tmp8
+--where Timeonly in ('01:55:00','08:25:00','15:55:00')
+--group by DR_date,[session],[Entry],SL,TP,[Close])b
+--on a.DR_date=b.DR_date and a.[session]=b.[session]
+
+
+drop table if exists #tmp14;
+
+Select a.*, 
+    COALESCE(b.[Entry], c.[Entry]) as [Entry], 
+    COALESCE(b.[SL], c.[SL]) as [SL], 
+    COALESCE(b.[TP], c.[TP]) as [TP], 
+    COALESCE(b.[SessionClosePrice], c.[SessionClosePrice]) as [SessionClosePrice]
+into #tmp14
+from #tmp13 a
+left join (
+    Select DR_date, [session], [Entry], SL, TP, [Close] as [SessionClosePrice] 
+    from #tmp8
+    where Timeonly in ('01:55:00','08:25:00','15:55:00')
+    group by DR_date, [session], [Entry], SL, TP, [Close]
+) b on a.DR_date = b.DR_date and a.[session] = b.[session]
+left join (
+    Select DR_date, [session], [Entry], SL, TP, [Close] as [SessionClosePrice] 
+    from #tmp8
+    where Timeonly in ('01:55:00','08:25:00','12:55:00')
+    group by DR_date, [session], [Entry], SL, TP, [Close]
+) c on a.DR_date = c.DR_date and a.[session] = c.[session];
+
 
 Select top 10* from #tmp14
 
@@ -628,9 +650,48 @@ Select a.*,
 into #tmp16
 from #tmp15 a
 
-Select  * from #tmp16 order by DR_Date desc
+Select  * from #tmp16 where [Session]='RDR' order by DR_Date desc
 --need refine!!!!!!!!
 --Summarize the data
+
+--overall
+
+
+drop table if exists #tmp17_1
+Select 
+	[Session],	
+	Outcome, count(DR_date) as Tradecount,
+	sum(RR) as RR 
+	into #tmp17_1
+	from #tmp16 
+group by 
+		[Session],Outcome 
+	
+
+
+drop table if exists #tmp19_1
+Select a.[Session], a.Outcome,a.Tradecount,b.DayswithEntry,a.RR
+	into #tmp19_1
+	from #tmp17_1 a
+	left join
+		(Select [Session],
+			sum(case when Outcome!='NoEntry' then Tradecount else 0 end) as DayswithEntry
+		from #tmp17_1
+		group by [Session]) b
+	on a.[Session]=b.[Session] 
+
+	Select * from #tmp19
+
+Select a.[Session],a.Outcome,a.Tradecount,a.DayswithEntry,a.RR,
+		case when a.DayswithEntry<>0 then 
+			round((cast(a.Tradecount as float)/a.DayswithEntry)*100,2)
+		else 0
+		end as WinPercentage
+from #tmp19_1 a
+order by a.[Session]
+
+
+
 
 drop table if exists #tmp17
 Select 
@@ -1977,3 +2038,6 @@ group by [Session],[DoW],Conf_Direction,[M7Box_Color_Close_SD_Range],[Box_Color_
 
 
 Select * from #DailyInfo06 where First_Conf_Time in ('20:55','04:40','10:30') and DR_Date>='2023-01-01'order by DR_Date desc
+Select DR_Date, ext, IDR_high-IDR_low as Range_Size from Futures.dbo.CLDailyInfo where Session in ('RDR') 
+group by DR_Date, IDR_high-IDR_low 
+having IDR_high-IDR_low > 1.5
