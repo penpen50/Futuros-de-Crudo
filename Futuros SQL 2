@@ -394,8 +394,42 @@ Select a.*,
 	case when [Low]<= ([SD0]-(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
 from #tmp7 a
 where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and TradingDateTime>[First_Conf_TradingDateTime] and Conf_Direction in ('Short')
+--Continue to part always same
 
---Choose date range
+/*Backtest by Entry by modifying SD*/
+
+Declare @SD_Target decimal(4,2);
+Declare @SD_SL decimal(4,2);
+Declare @plus_tick decimal(4,2);
+Declare @Entry decimal(4,2);
+set @SD_Target=1.5;
+set @SD_SL=-0.5;  --Change as needed
+set @plus_tick=3;
+set @Entry=-0.2  --Change as needed
+
+Select a.*,
+		[SD0]+(@Entry*10* [SD_Size]) as [Entry],
+		case when [SD0]+(@Entry*10* [SD_Size]) between [Low] and [High] then 1 else 0 end as [Qualify_Entry_Time],
+		[SD0]+(@SD_SL*10* [SD_Size])-(0.01*@plus_tick) as [SL],
+		case when [Low]<=([SD0]+(@SD_SL*10* [SD_Size])-(0.01*@plus_tick)) then 1 else 0 end as [SL_hit],
+		[SD0]+(@SD_Target*10*SD_Size) as [TP],
+		case when [High]>=([SD0]+(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
+	into #tmp8_1
+	from #tmp7 a
+	where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and TradingDateTime>[First_Conf_TradingDateTime] and Conf_Direction in ('Long')
+	union all
+Select a.*,
+	[SD0] - (@SD_SL*10* [SD_Size]) as [Entry],
+	case when [SD0] - (@SD_SL*10* [SD_Size]) between [Low] and [High] then 1 else 0 end as [Qualify_Entry_Time],
+	[SD0] - (@SD_SL*10* [SD_Size])+(0.01*@plus_tick) as [SL],
+	case when [High]>=([SD0]-(@SD_SL*10* [SD_Size])+(0.01*@plus_tick)) then 1 else 0 end as [SL_hit],
+	[SD0]-(@SD_Target*10*SD_Size) as [TP],
+	case when [Low]<= ([SD0]-(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
+from #tmp7 a
+where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and TradingDateTime>[First_Conf_TradingDateTime] and Conf_Direction in ('Short')
+
+--Part always same
+--Choose date range 
 drop table if exists #tmp8
 Select * into #tmp8 from #tmp8_1 where Dateonly>='2024-01-01'
 
