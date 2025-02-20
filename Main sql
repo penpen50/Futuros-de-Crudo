@@ -469,7 +469,7 @@ set @SD_Target=1.5;
 set @plus_tick=3;
 set @Entry=-0.2  --Change as needed
 
-Select a.*,
+Select a.*,--12copilot
 		[SD0]+(@Entry*10* [SD_Size]) as [Entry],
 		case when [SD0]+(@Entry*10* [SD_Size]) between [Low] and [High] then 1 else 0 end as [Qualify_Entry_Time],
  [DR_Low]-(0.01*@plus_tick) as [SL],
@@ -1917,7 +1917,7 @@ Select top 100* from #RBC_M7Box_Close_ret
 
 --Combine M7 retracement with max ext with detail dataset. M7 retracement category by both wick and close --6
 
-drop table if exists #DailyInfo06_1
+drop table if exists #DailyInfo06_3 --12
 Select a.*, 
 	((a.[DR_High]-a.[IDR_High])/a.SD_tick_Size)*10 as DR_High_thickness_SD, --9
 	((a.[IDR_Low]-a.[DR_Low])/a.SD_tick_Size)*10 as DR_Low_thickness_SD, --9
@@ -1944,14 +1944,28 @@ case
 		when a.[Box Color] in ('Red') and c.RBC_M7Box_Close_ret<=[Close] then 'RBC always close outside M7Box'--6
 		when a.[Box Color] in ('Grey') then 'No Box Color'
 	else 'RBC Close inside M7Box' end as RBC_M7Box_CloseOutside
-into #DailyInfo06_1
+into #DailyInfo06_3 --12
 from #DailyInfo05 a
 left join #RBC_M7Box_retracement b
 on a.DR_Date=b.DR_Date and a.[Session]=b.[Session]
 left join #RBC_M7Box_Close_ret c
 on a.DR_Date=c.DR_Date and a.[Session]=c.[Session]
 
+--12
+--Transpose model column
+Select DR_Date,
+	MAX(case when [Session]='ADR' then Model end) as ADR_Model,
+	MAX(case when [Session]='ODR' then Model end) as ODR_Model,
+	MAX(case when [Session]='RDR' then Model end) as RDR_Model
+into #DailyInfo06_4
+from #DailyInfo06_3
+group by DR_Date
 
+Select a.*,b.ADR_Model,b.ODR_Model,b.RDR_Model
+	into #DailyInfo06_1
+	from #DailyInfo06_3
+left join #DailyInfo06_4 b
+on a.DR_date=b.DR_Date
 
 
 Select * from #DailyInfo06 where [Session]='RDR' and DoW=3 and Conf_Direction='Long' and [Box Color]='Green'
@@ -2117,6 +2131,9 @@ Select
 	[ODR_Broken_Type],
 
 	[Model],
+	[ADR_Model],--12
+	[ODR_Model],--12
+	[ODR_Model],--12
 
 	left(convert(varchar,[M7_Broken],108),5) as [M7_Broken],
 	[RBC_M7_Broken],
@@ -2210,3 +2227,9 @@ Select * from #DailyInfo06 where First_Conf_Time in ('20:55','04:40','10:30') an
 Select DR_Date, ext, IDR_high-IDR_low as Range_Size from Futures.dbo.CLDailyInfo where Session in ('RDR') 
 group by DR_Date, IDR_high-IDR_low 
 having IDR_high-IDR_low > 1.5
+
+--False day in relation to M7 box study
+Select [TF Date], M7Box_Close_SD_Range, count(DR_Date) fom #DailyInfo06 
+	where max_ret_SD<=-0.7 and [Session]='RDR' 
+group by [TF Day],M7Box_Close_SD_Range
+order by [TF Day] --12
