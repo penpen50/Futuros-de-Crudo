@@ -1386,6 +1386,13 @@ Select
 	[SD_Size],
 	[SD_tick_Size],
 	[SD0],
+--Determine the top and bottom of M7 box price level to facilitate backtest --13
+
+	case when [Open]>[Close] then [Open] else [Close] end as [M7Box_Raw_top],
+
+case when [Open]<[Close] then [Open] else [Close] end as [M7Box_Raw_bottom],
+
+
 	[DR_High_SD],
 	concat(format(DR_High_SD_lower,'0.00'),'  to ',format(DR_High_SD_upper,'0.00')) as [DR_High_SD_Range],
 	[DR_Low_SD],
@@ -1828,7 +1835,7 @@ from #tmp14
 Select top 10 * from #tmp15								
 --determine R achieved
 
-drop table if exists #tmp16
+drop table if exists #tmp16_1
 Select a.*,
 	convert(decimal(10,2),
 		case when [Outcome]='No Entry' then 0
@@ -1836,8 +1843,23 @@ Select a.*,
              when [Outcome]='Success' then PotentialRR
              when [Outcome]='Exit' then (PL)/abs([Entry]-SL)
 	end) as [RR]
-into #tmp16
+into #tmp16_1 --13
 from #tmp15 a
+
+
+drop table if exists #tmp16
+Select a.*,b.[Open],b.[Close],
+	case when a.Conf_Direction='Long' and a.[Entry]<b.[M7Box_Raw_bottom] then 'Below M7Box'
+		when a.Conf_Direction='Long' and a.[Entry]>b.[M7Box_Raw_top] then 'Above M7Box'
+		when a.Conf_Direction='Short' and a.[Entry]<b.[M7Box_Raw_bottom] then 'Above M7Box'
+		when a.Conf_Direction='Short' and a.[Entry]>b.[M7Box_Raw_top] then 'Below M7Box'
+		when a.[Entry]<=b.[M7Box_Raw_top] and a.[Entry]>=b.[M7Box_raw_bottom] then 'Inside M7Box' --inclusive of open and close line
+	when a.Conf_Direction='No Conf' then 'No Conf'
+	end as [Entry relative to M7Box]
+into #tmp16
+from #tmp16_1
+left join #DailyInfo06 b
+on a.DR_date=b.DR_date and a.[Session]=b.[Session]
 
 Select  * from #tmp16 where [Session]='RDR' order by DR_Date desc
 --need refine!!!!!!!!
