@@ -1,4 +1,5 @@
 
+
 Select top 10 * from  [dbo].[CL_5min_IndividualCon] where TradingDatetime='2008-08-31 16:10:00.0000000'
 
 CREATE TABLE [dbo].[CL_Events] (
@@ -151,7 +152,7 @@ Select a.*,
 into #tmp4
 from #tmp2 a
 left join #tmp3 b
-on a.DR_Date=b.DR_Date and a. [Session]=b. [Session]
+on a.DR_Date=b.DR_Date and a.[Session]=b.[Session]
 
 --Select top 10 * from #tmp3
 
@@ -320,7 +321,7 @@ Select a.*,
 	case when First_Conf_Time in ('20:30','04:00','10:30') then 1 else 0 end as FirstCandleConf
 into #tmp6_1
 from #tmp5 a
-Select top 10 * from #tmp6_1
+--Select top 10 * from #tmp6_1
 
 drop table if exists #tmp6
 Select 
@@ -929,7 +930,7 @@ from #DailyInfo03
 where [Session]='RDR'
 group by [Box Color],Conf_Direction,RBC_M7_Broken
 
-Select * from #M7Box_violated1
+--Select * from #M7Box_violated1
 --Calculate %
 Select [Box Color],Conf_Direction,RBC_M7_Broken,[Days],[Box_Color_Count],
 	ROUND(CAST([Days] AS FLOAT) / CAST([Box_Color_Count] AS FLOAT) * 100, 2) AS [Result]
@@ -1205,8 +1206,6 @@ Select DR_date,[Session],TradingDateTime,Timeonly,[Close] as RBC_M7Box_Close_ret
 where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and [Box Color]='Red' and TradingDateTime<First_Conf_TradingDateTime
 group by DR_date,[Session],TradingDateTime,Timeonly,[Close],First_Conf_TradingDateTime
 
-
-
 drop table if exists #RBC_M7Box_Close_ret
 Select *
 	into #RBC_M7Box_Close_ret
@@ -1386,12 +1385,9 @@ Select
 	[SD_Size],
 	[SD_tick_Size],
 	[SD0],
---Determine the top and bottom of M7 box price level to facilitate backtest --13
-
+	--Determine the top and bottom of M7 box price level to facilitate backtest --13
 	case when [Open]>[Close] then [Open] else [Close] end as [M7Box_Raw_top],
-
-case when [Open]<[Close] then [Open] else [Close] end as [M7Box_Raw_bottom],
-
+	case when [Open]<[Close] then [Open] else [Close] end as [M7Box_Raw_bottom],
 
 	[DR_High_SD],
 	concat(format(DR_High_SD_lower,'0.00'),'  to ',format(DR_High_SD_upper,'0.00')) as [DR_High_SD_Range],
@@ -1580,7 +1576,7 @@ where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and TradingDateTime>[Fi
 --Continue to part always same
 
 /*Backtest by Retirement setup*/
-/* Backtest by Retirement setup */
+
 drop table if exists #tmp8_1;
 
 Declare @SD_Target decimal(4,2);
@@ -1632,8 +1628,8 @@ Declare @SD_Target decimal(4,2);
 Declare @SD_SL decimal(4,2);
 Declare @plus_tick decimal(4,2);
 Declare @Entry decimal(4,2);
-set @SD_Target=1.5;
-set @SD_SL=-0.5;  --Change as needed
+set @SD_Target=1.4;
+set @SD_SL=-0.3;  --Change as needed
 set @plus_tick=3;
 set @Entry=0  --Change as needed
 
@@ -1808,7 +1804,17 @@ left join (
 
 --Calculate R  
 drop table if exists #tmp15
-Select DR_date,[session],Conf_Direction,
+Select DR_date,
+		case format(DR_date,'ddd') 
+			when 'Mon' then 1
+			when 'Tue' then 2
+			when 'Wed' then 3
+			when 'Thu' then 4
+			when 'Fri' then 5
+			when 'Sat' then 6
+			when 'Sun' then 7
+		end as DoW,
+		[session],Conf_Direction,
 		convert(VARCHAR(5),cast(FirstEntryTime as Time),108) as [FirstEntryTime],
 		convert(VARCHAR(5),cast(Stop_Out_Time as Time),108) as [Stop_Out_Time],
 		convert(VARCHAR(5),cast(TP_Reach_Time as Time),108) as [TP_Reach_Time],
@@ -1857,7 +1863,7 @@ Select a.*,b.[Open],b.[Close],
 	when a.Conf_Direction='No Conf' then 'No Conf'
 	end as [Entry relative to M7Box]
 into #tmp16
-from #tmp16_1
+from #tmp16_1 a
 left join #DailyInfo06 b
 on a.DR_date=b.DR_date and a.[Session]=b.[Session]
 
