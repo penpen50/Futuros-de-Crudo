@@ -1277,6 +1277,8 @@ drop table if exists #DailyInfo06_2
 With Buckets As(
 	Select
 		*,
+    CASE WHEN [Open] > [Close] THEN [Open] ELSE [Close] END AS [M7Box_Raw_top],
+    CASE WHEN [Open] < [Close] THEN [Open] ELSE [Close] END AS [M7Box_Raw_bottom],
 	Floor(DR_High_SD*10)/10+0.1 as DR_High_SD_upper,
 	Floor(DR_High_SD*10)/10 as DR_High_SD_lower,
 
@@ -1388,6 +1390,11 @@ Select
 	--Determine the top and bottom of M7 box price level to facilitate backtest --13
 	case when [Open]>[Close] then [Open] else [Close] end as [M7Box_Raw_top],
 	case when [Open]<[Close] then [Open] else [Close] end as [M7Box_Raw_bottom],
+	[M7Box_Raw_top],--15
+	[M7Box_Raw_bottom],
+	M7Box_Raw_top-((M7Box_Raw_top-M7Box_Raw_bottom)*0.25) as [M7_0.25],
+	M7Box_Raw_top-((M7Box_Raw_top-M7Box_Raw_bottom)*0.5) as [M7_0.5],
+	M7Box_Raw_top-((M7Box_Raw_top-M7Box_Raw_bottom)*0.75) as [M7_0.75],
 
 	[DR_High_SD],
 	concat(format(DR_High_SD_lower,'0.00'),'  to ',format(DR_High_SD_upper,'0.00')) as [DR_High_SD_Range],
@@ -1486,6 +1493,17 @@ Select
 	[RBC_M7Box_Retracement_SD],
 	concat(format(RBC_M7Box_Retracement_SD_lower,'0.00'),'  to ',format(RBC_M7Box_Retracement_SD_upper,'0.00')) as [RBC_M7Box_Retracement_SD_Range],
 
+	--15 --RBC study 
+	--Define 0%, 25%, 50%, 75% and 100% 
+	case 
+		when RBC_M7Box_Retracement_SD>0 then 'Above RBC' 
+		when RBC_M7Box_Retracement_SD<0 and RBC_M7Box_Retracement_SD>-0.25 then '0<RBC_ret<0.25' 
+		when RBC_M7Box_Retracement_SD<=-0.25 and RBC_M7Box_Retracement_SD>-0.5 then '0.25<=RBC_ret<0.5' 
+		when RBC_M7Box_Retracement_SD<=-0.5 and RBC_M7Box_Retracement_SD>-0.75 then '0.5<=RBC_ret<0.75' 
+		when RBC_M7Box_Retracement_SD<=-0.75 and RBC_M7Box_Retracement_SD>=-1 then '0.75<=RBC_ret<=1' 
+		when RBC_M7Box_Retracement_SD<-1 then 'Below RBC' 
+	else 'sth wrong' end as RBC_M7Box_Retracement_quadrant,
+
 	[RBC_M7Box_Broken],--6
 	[RBC_M7Box_Broken_Close],
 	[RBC_M7Box_CloseOutside]
@@ -1539,7 +1557,18 @@ order by [Box_Color_match_Conf_direction],[TF Day] --12
 
 Select top 100 * from #DailyInfo06 where max_ret_SD>=1 order by DR_date desc
 
-
+Select [Session],[TF Day], 
+	case 
+		when Max_Ret_SD < M7Box_Close_SD then 'Below M7Box' 
+		when Max_Ret_SD < M7Box_Open_SD and Max_Ret_SD >= M7Box_Close_SD then 'Inside M7Box' 
+		when Max_Ret_SD >= M7Box_Open_SD then 'Above M7Box' end as [Price Position], 
+		count (DR_date) as [Days count] 
+		from #DailyInfo06 
+		where Conf_Direction not in ('No Conf') 
+	group by [Session],[TF Day], 
+		case when Max_Ret_SD < M7Box_Close_SD then 'Below M7Box' 
+			 when Max_Ret_SD < M7Box_Open_SD and Max_Ret_SD >= M7Box_Close_SD then 'Inside M7Box' 
+			 when Max_Ret_SD >= M7Box_Open_SD then 'Above M7Box' end order by [Session]
 /****************************************************************************************************************************************************************/
 /************Backtesting************/
 --Testing sucess rate at DR entry
