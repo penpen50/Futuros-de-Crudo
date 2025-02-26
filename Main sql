@@ -1,5 +1,3 @@
-
-
 Select top 10 * from  [dbo].[CL_5min_IndividualCon] where TradingDatetime='2008-08-31 16:10:00.0000000'
 
 CREATE TABLE [dbo].[CL_Events] (
@@ -161,7 +159,7 @@ on a.DR_Date=b.DR_Date and a.[Session]=b.[Session]
 --#tmp5 stores all the important time and confirmation direction
 --Figure out confimation time
 --#tmp5 stores all the important time and confirmation direction
-Select * from #tmp4
+--Select * from #tmp4
 
 drop table if exists #tmp5
 
@@ -1388,8 +1386,6 @@ Select
 	[SD_tick_Size],
 	[SD0],
 	--Determine the top and bottom of M7 box price level to facilitate backtest --13
-	case when [Open]>[Close] then [Open] else [Close] end as [M7Box_Raw_top],
-	case when [Open]<[Close] then [Open] else [Close] end as [M7Box_Raw_bottom],
 	[M7Box_Raw_top],--15
 	[M7Box_Raw_bottom],
 	M7Box_Raw_top-((M7Box_Raw_top-M7Box_Raw_bottom)*0.25) as [M7_0.25],
@@ -1897,6 +1893,9 @@ left join #DailyInfo06 b
 on a.DR_date=b.DR_date and a.[Session]=b.[Session]
 
 Select  * from #tmp16 where [Session]='RDR' order by DR_Date desc
+Select top 10 * from 
+
+
 --need refine!!!!!!!!
 --Summarize the data
 
@@ -1995,7 +1994,7 @@ from #tmp19 a
 --5
 --Combine with M7 Box color close SD to find the best sent it entry
 
-Select a.*,b.DoW,b.M7BoxSixe,b.M7Box_Color_Close_SD
+Select a.*,b.DoW,b.M7BoxSize,b.M7Box_Color_Close_SD
 from #tmp16 a
 left join #DailyInfo06 b
 on a.[DR_date]=b.[DR_date] and a.[Session]=b.[Session]
@@ -2077,14 +2076,17 @@ Select a.*,
 	case when [Low]<=([IDR_Low]-(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
 from #tmp7 a
 where [Session] in ('ADR','ODR','RDR') and DR_Box='Other' and [Box Color] in ('Red') and [M7Box_Color_Close_SD]<-0.8
+
+
 /***check***/
 select DR_date, [Session],[SessionClose], [Low] as [SL_temp] 
 into #tmp8_SLtemp from #tmp7 
 where [Box Color] in ('Green') and Timeonly in ('20:25:00','03:55:00','10:25:00') 
-group by DR_date, [Session],[Low] 
+group by DR_date, [Session],[SessionClose],[Low] 
 union all 
-select DR_date, [Session],[SessionClose], [Low] as [SL_temp],[High] as [SL_temp] 
-from #tmp7 where [Box Color] in ('Red') and Timeonly in ('20:25:00','03:55:00','10:25:00') group by DR_date, [Session],[High]
+select DR_date, [Session],[SessionClose],[High] as [SL_temp] 
+from #tmp7 where [Box Color] in ('Red') and Timeonly in ('20:25:00','03:55:00','10:25:00') 
+group by DR_date, [Session],[SessionClose],[High]
 
 
 /*RBC backtest*/
@@ -2169,7 +2171,7 @@ from
 		cast(min(TradingDateTime) as Time) as FirstEntryTime
 		from #tmp8
 	where [Qualify_Entry_Time]=1
-	group by DR_Date,[Session],[Conf_Direction,[Box Color]) a
+	group by DR_Date,[Session],[Conf_Direction],[Box Color]) a
 left join
 	(Select DR_date,[Session],
 		cast(min(TradingDateTime) as Time) as [Stop_Out_Time]
