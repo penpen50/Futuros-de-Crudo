@@ -1272,7 +1272,7 @@ on a.DR_date=b.DR_Date
 
 drop table if exists #DailyInfo06_2
 
-With Buckets As(
+With InitialBuckets As( --16
 	Select
 		*,
     CASE WHEN [Open] > [Close] THEN [Open] ELSE [Close] END AS [M7Box_Raw_top],
@@ -1332,7 +1332,15 @@ With Buckets As(
 	Floor(RBC_M7Box_retracement_SD*10)/10 as RBC_M7Box_retracement_SD_lower
 
 	from #DailyInfo06_1
-	)
+	),
+Buckets AS (
+	Select *,
+		M7Box_Raw_top-((M7Box_Raw_top-M7Box_Raw_bottom)*0.25) as [M7_0.25],
+	M7Box_Raw_top-((M7Box_Raw_top-M7Box_Raw_bottom)*0.5) as [M7_0.5],
+	M7Box_Raw_top-((M7Box_Raw_top-M7Box_Raw_bottom)*0.75) as [M7_0.75]
+from InitialBuckets
+)
+
 
 Select
 	[DR_Date],
@@ -1388,9 +1396,13 @@ Select
 	--Determine the top and bottom of M7 box price level to facilitate backtest --13
 	[M7Box_Raw_top],--15
 	[M7Box_Raw_bottom],
-	M7Box_Raw_top-((M7Box_Raw_top-M7Box_Raw_bottom)*0.25) as [M7_0.25],
-	M7Box_Raw_top-((M7Box_Raw_top-M7Box_Raw_bottom)*0.5) as [M7_0.5],
-	M7Box_Raw_top-((M7Box_Raw_top-M7Box_Raw_bottom)*0.75) as [M7_0.75],
+	[M7_0.25],--16
+	[M7_0.5],--16
+	[M7_0.75],--16
+
+
+
+	
 
 	[DR_High_SD],
 	concat(format(DR_High_SD_lower,'0.00'),'  to ',format(DR_High_SD_upper,'0.00')) as [DR_High_SD_Range],
@@ -1450,6 +1462,33 @@ Select
 	[Max_Ret],
 	[Max_Ret_SD],
 	concat(format(Max_Ret_SD_lower,'0.00'),'  to ',format(Max_Ret_SD_upper,'0.00')) as [Max_Ret_SD_Range],
+case
+	when Conf_Direction='Long' and Max_Ret>=[M7Box_Raw_top] then 'Above M7Box'
+	when Conf_Direction='Long' and Max_Ret<[M7Box_Raw_top] and Max_ret>=[M7Box_Raw_bottom]  then 'Inside M7Box'
+	when Conf_Direction='Long' and Max_Ret<[M7Box_Raw_bottom] then 'Below M7Box' 
+
+when Conf_Direction='Short' and Max_Ret<=[M7Box_Raw_bottom] then 'Above M7Box'
+	when Conf_Direction='Short' and Max_Ret>[M7Box_Raw_bottom] and Max_ret<=[M7Box_Raw_top]  then 'Inside M7Box'
+	when Conf_Direction='Short' and Max_Ret>[M7Box_Raw_top] then 'Below M7Box'
+when Conf_Direction='No Conf' then 'No Conf'
+end as [Max_ret_M7box_pos_conf_base],
+
+case --16
+	when Conf_Direction='Long' and Max_Ret>=[M7Box_Raw_top] then 'Above M7Box'
+	when Conf_Direction='Long' and Max_Ret<[M7Box_Raw_top] and Max_ret>=[M7_0.5]  then 'Inside M7Box (above M7Box0.5)'
+	when Conf_Direction='Long' and Max_Ret<[M7_0.5] and Max_ret>=[M7Box_Raw_bottom]  then 'Inside M7Box (below M7Box0.5)'
+when Conf_Direction='Long' and Max_Ret<[M7Box_Raw_bottom] then 'Below M7Box' 
+
+when Conf_Direction='Short' and Max_Ret<=[M7Box_Raw_bottom] then 'Above M7Box'
+	when Conf_Direction='Short' and Max_Ret>[M7Box_Raw_bottom] and Max_ret<=[M7_0.5]  then 'Inside M7Box (above M7Box0.5)'
+	when Conf_Direction='Short' and Max_Ret>[M7_0.5] and Max_ret<=[M7Box_Raw_top]  then 'Inside M7Box (below M7Box0.5)'
+	when Conf_Direction='Short' and Max_Ret>[M7Box_Raw_top] then 'Below M7Box'
+when Conf_Direction='No Conf' then 'No Conf'
+end as [Max_ret_M7box_0.5_conf_base],
+
+	
+
+
 
 
 	left(convert(varchar,[M7ExtDateTime],120),16) as [M7ExtDateTime],
@@ -1465,6 +1504,19 @@ Select
 	[M7_retracement],
 	[M7_ret_SD],
 	concat(format(M7_ret_SD_lower,'0.00'),'  to ',format(M7_ret_SD_upper,'0.00')) as [M7_ret_SD_Range],
+
+case --16 change to M7_retracement!!!!!
+	when Conf_Direction='Long' and Max_Ret>=[M7Box_Raw_top] then 'Above M7Box'
+	when Conf_Direction='Long' and Max_Ret<[M7Box_Raw_top] and Max_ret>=[M7_0.5]  then 'Inside M7Box (above M7Box0.5)'
+	when Conf_Direction='Long' and Max_Ret<[M7_0.5] and Max_ret>=[M7Box_Raw_bottom]  then 'Inside M7Box (below M7Box0.5)'
+when Conf_Direction='Long' and Max_Ret<[M7Box_Raw_bottom] then 'Below M7Box' 
+
+when Conf_Direction='Short' and Max_Ret<=[M7Box_Raw_bottom] then 'Above M7Box'
+	when Conf_Direction='Short' and Max_Ret>[M7Box_Raw_bottom] and Max_ret<=[M7_0.5]  then 'Inside M7Box (above M7Box0.5)'
+	when Conf_Direction='Short' and Max_Ret>[M7_0.5] and Max_ret<=[M7Box_Raw_top]  then 'Inside M7Box (below M7Box0.5)'
+	when Conf_Direction='Short' and Max_Ret>[M7Box_Raw_top] then 'Below M7Box'
+when Conf_Direction='No Conf' then 'No Conf'
+end as [Max_ret_M7box_0.5_conf_base],
 
 
 
