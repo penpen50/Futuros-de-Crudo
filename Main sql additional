@@ -1,0 +1,75 @@
+-- Drop the existing table if it exists
+drop table if exists #tmp8_1;
+
+-- Declare variables
+Declare @SD_Target decimal(4,2);
+Declare @SD_SL decimal(4,2);
+Declare @plus_tick decimal(4,2);
+Declare @Entry decimal(4,2);
+Declare @InitialEntry decimal(4,2);
+Declare @Step decimal(4,2);
+Declare @MaxEntry decimal(4,2);
+
+set @SD_Target = 1.5;
+set @SD_SL = -0.5;  
+set @plus_tick = 3;
+set @InitialEntry = 0.0;  -- Starting value
+set @Step = -0.1;  -- Step value
+set @MaxEntry = -0.5;  -- Ending value
+
+-- Initialize the Entry value
+set @Entry = @InitialEntry;
+
+-- Create a temporary table to hold the results
+
+   Select a.*,
+            [SD0]+(@Entry*10* [SD_Size]) as [Entry],
+            case when [SD0]+(@Entry*10* [SD_Size]) between [Low] and [High] then 1 else 0 end as [Qualify_Entry_Time],
+            [SD0]+(@SD_SL*10* [SD_Size])-(0.01*@plus_tick) as [SL],
+            case when [Low]<=([SD0]+(@SD_SL*10* [SD_Size])-(0.01*@plus_tick)) then 1 else 0 end as [SL_hit],
+            [SD0]+(@SD_Target*10*SD_Size) as [TP],
+            case when [High]>=([SD0]+(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
+	into #tmp8_
+        from #tmp7 a
+        where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and TradingDateTime>[First_Conf_TradingDateTime] and Conf_Direction in ('Long')
+        union all
+    Select a.*,
+            [SD0] - (@Entry* [SD_Size]) as [Entry],
+            case when [SD0] - (@Entry * 10* [SD_Size]) between [Low] and [High] then 1 else 0 end as [Qualify_Entry_Time],
+            [SD0] - (@SD_SL*10* [SD_Size])+(0.01*@plus_tick) as [SL],
+            case when [High]>=([SD0]-(@SD_SL*10* [SD_Size])+(0.01*@plus_tick)) then 1 else 0 end as [SL_hit],
+            [SD0]-(@SD_Target*10*SD_Size) as [TP],
+            case when [Low]<= ([SD0]-(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
+        from #tmp7 a
+        where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and TradingDateTime>[First_Conf_TradingDateTime] and Conf_Direction in ('Short')
+
+-- Loop through the entry values
+WHILE @Entry >= @MaxEntry
+BEGIN
+    -- Insert the results for the current entry value into the temporary table
+    insert into #tmp8_1
+    Select a.*,
+            [SD0]+(@Entry*10* [SD_Size]) as [Entry],
+            case when [SD0]+(@Entry*10* [SD_Size]) between [Low] and [High] then 1 else 0 end as [Qualify_Entry_Time],
+            [SD0]+(@SD_SL*10* [SD_Size])-(0.01*@plus_tick) as [SL],
+            case when [Low]<=([SD0]+(@SD_SL*10* [SD_Size])-(0.01*@plus_tick)) then 1 else 0 end as [SL_hit],
+            [SD0]+(@SD_Target*10*SD_Size) as [TP],
+            case when [High]>=([SD0]+(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
+        from #tmp7 a
+        where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and TradingDateTime>[First_Conf_TradingDateTime] and Conf_Direction in ('Long')
+        union all
+    Select a.*,
+            [SD0] - (@Entry* [SD_Size]) as [Entry],
+            case when [SD0] - (@Entry * 10* [SD_Size]) between [Low] and [High] then 1 else 0 end as [Qualify_Entry_Time],
+            [SD0] - (@SD_SL*10* [SD_Size])+(0.01*@plus_tick) as [SL],
+            case when [High]>=([SD0]-(@SD_SL*10* [SD_Size])+(0.01*@plus_tick)) then 1 else 0 end as [SL_hit],
+            [SD0]-(@SD_Target*10*SD_Size) as [TP],
+            case when [Low]<= ([SD0]-(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
+        from #tmp7 a
+        where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and TradingDateTime>[First_Conf_TradingDateTime] and Conf_Direction in ('Short');
+
+    -- Decrement the Entry value by the step value
+    set @Entry = @Entry + @Step;
+END;
+
+
