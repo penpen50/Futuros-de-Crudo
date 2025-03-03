@@ -1,3 +1,7 @@
+
+--Recurring testing
+--New 
+
 -- Drop the existing table if it exists
 drop table if exists #tmp8_1;
 
@@ -22,18 +26,18 @@ set @Entry = @InitialEntry;
 
 -- Create a temporary table to hold the results
 
-   Select a.*,
+   Select a.*, @Entry as [Entry_SD],
             [SD0]+(@Entry*10* [SD_Size]) as [Entry],
             case when [SD0]+(@Entry*10* [SD_Size]) between [Low] and [High] then 1 else 0 end as [Qualify_Entry_Time],
             [SD0]+(@SD_SL*10* [SD_Size])-(0.01*@plus_tick) as [SL],
             case when [Low]<=([SD0]+(@SD_SL*10* [SD_Size])-(0.01*@plus_tick)) then 1 else 0 end as [SL_hit],
             [SD0]+(@SD_Target*10*SD_Size) as [TP],
             case when [High]>=([SD0]+(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
-	into #tmp8_
+	into #tmp8_1
         from #tmp7 a
-        where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and TradingDateTime>[First_Conf_TradingDateTime] and Conf_Direction in ('Long')
+        where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and T_DateTime>[First_Conf_T_DateTime] and Conf_Direction in ('Long')
         union all
-    Select a.*,
+    Select a.*,@Entry as [Entry_SD],
             [SD0] - (@Entry* [SD_Size]) as [Entry],
             case when [SD0] - (@Entry * 10* [SD_Size]) between [Low] and [High] then 1 else 0 end as [Qualify_Entry_Time],
             [SD0] - (@SD_SL*10* [SD_Size])+(0.01*@plus_tick) as [SL],
@@ -41,14 +45,14 @@ set @Entry = @InitialEntry;
             [SD0]-(@SD_Target*10*SD_Size) as [TP],
             case when [Low]<= ([SD0]-(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
         from #tmp7 a
-        where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and TradingDateTime>[First_Conf_TradingDateTime] and Conf_Direction in ('Short')
+        where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and T_DateTime>[First_Conf_T_DateTime] and Conf_Direction in ('Short')
 
 -- Loop through the entry values
 WHILE @Entry >= @MaxEntry
 BEGIN
     -- Insert the results for the current entry value into the temporary table
     insert into #tmp8_1
-    Select a.*,
+    Select a.*,@Entry as [Entry_SD],
             [SD0]+(@Entry*10* [SD_Size]) as [Entry],
             case when [SD0]+(@Entry*10* [SD_Size]) between [Low] and [High] then 1 else 0 end as [Qualify_Entry_Time],
             [SD0]+(@SD_SL*10* [SD_Size])-(0.01*@plus_tick) as [SL],
@@ -56,9 +60,9 @@ BEGIN
             [SD0]+(@SD_Target*10*SD_Size) as [TP],
             case when [High]>=([SD0]+(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
         from #tmp7 a
-        where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and TradingDateTime>[First_Conf_TradingDateTime] and Conf_Direction in ('Long')
+        where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and T_DateTime>[First_Conf_T_DateTime] and Conf_Direction in ('Long')
         union all
-    Select a.*,
+    Select a.*,@Entry as [Entry_SD],
             [SD0] - (@Entry* [SD_Size]) as [Entry],
             case when [SD0] - (@Entry * 10* [SD_Size]) between [Low] and [High] then 1 else 0 end as [Qualify_Entry_Time],
             [SD0] - (@SD_SL*10* [SD_Size])+(0.01*@plus_tick) as [SL],
@@ -66,7 +70,7 @@ BEGIN
             [SD0]-(@SD_Target*10*SD_Size) as [TP],
             case when [Low]<= ([SD0]-(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
         from #tmp7 a
-        where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and TradingDateTime>[First_Conf_TradingDateTime] and Conf_Direction in ('Short');
+        where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and T_DateTime>[First_Conf_T_DateTime] and Conf_Direction in ('Short');
 
     -- Decrement the Entry value by the step value
     set @Entry = @Entry + @Step;
@@ -84,15 +88,15 @@ Select a.DR_date,a.[session],a.Conf_Direction,a.[Box Color],a.[Entry_SD],
 into #tmp9
 from
         (Select DR_date,[session],Conf_Direction,[Box Color],[Entry_SD],
-            min(TradingDateTime) as FirstEntryTime
-                --cast(min(TradingDateTime) as Time) as FirstEntryTime
+            min(T_DateTime) as FirstEntryTime
+                --cast(min(T_DateTime) as Time) as FirstEntryTime
         from #tmp8
         where [Qualify_Entry_Time]=1
         group by DR_date,[session],Conf_Direction,[Box Color],[Entry_SD])  a
 left join
-        (Select DR_date,[session],[Box Color],[Entry_SD]
-            min(TradingDateTime) as [Stop_Out_Time]
-                --cast(min(TradingDateTime) as Time) as [Stop_Out_Time]
+        (Select DR_date,[session],[Box Color],[Entry_SD],
+            min(T_DateTime) as [Stop_Out_Time]
+                --cast(min(T_DateTime) as Time) as [Stop_Out_Time]
         from #tmp8
         where [SL_hit]=1 group by DR_date,[session],[Box Color],[Entry_SD] ) b
 on a.DR_date=b.DR_date and a.[Session]=b.[Session] and a.[Entry_SD]=b.[Entry_SD]
@@ -123,7 +127,7 @@ Select a.DR_date,a.[Session],a.Conf_Direction,a.[Box Color],a.[Entry_SD],
 	b.FirstEntryTime, b.Stop_Out_Time,c.[TP_Reach_Time]
 into #Result
 from #tmp8 a
-left join #tmp 9 b
+left join #tmp9 b
 on a.DR_date=b.DR_date and a.[Session]=b.[Session] and a.[Entry_SD]=b.[Entry_SD]
 left join #TPreach c
 on a.DR_date=c.DR_date and a.[Session]=c.[Session] and a.[Entry_SD]=c.[Entry_SD]
@@ -196,7 +200,7 @@ Select DR_date,
                         when 'Sat' then 6
                         when 'Sun' then 7
                 end as DoW,
-                [session],Conf_Direction,[Entry_SD]
+                [session],Conf_Direction,[Entry_SD],
                 convert(VARCHAR(5),cast(FirstEntryTime as Time),108) as [FirstEntryTime],
                 convert(VARCHAR(5),cast(Stop_Out_Time as Time),108) as [Stop_Out_Time],
                 convert(VARCHAR(5),cast(TP_Reach_Time as Time),108) as [TP_Reach_Time],
@@ -222,6 +226,7 @@ from #tmp14
 
 Select top 10 * from #tmp15                                                                
 --determine R achieved
+--not done. TB done
 
 drop table if exists #tmp16_1
 Select a.*,
@@ -235,3 +240,127 @@ into #tmp16_1 --13
 from #tmp15 a
 
 
+drop table if exists #tmp16_1
+Select a.*,
+	convert(decimal(10,2),
+		case when [Outcome]='No Entry' then 0
+			 when [Outcome]='Fail' then -1
+             when [Outcome]='Success' then PotentialRR
+             when [Outcome]='Exit' then (PL)/abs([Entry]-SL)
+	end) as [RR]
+into #tmp16_1 --13
+from #tmp15 a
+
+
+drop table if exists #tmp16
+Select a.*,b.[Open],b.[Close],
+	case when a.Conf_Direction='Long' and a.[Entry]<b.[M7Box_Raw_bottom] then 'Below M7Box'
+		when a.Conf_Direction='Long' and a.[Entry]>b.[M7Box_Raw_top] then 'Above M7Box'
+		when a.Conf_Direction='Short' and a.[Entry]<b.[M7Box_Raw_bottom] then 'Above M7Box'
+		when a.Conf_Direction='Short' and a.[Entry]>b.[M7Box_Raw_top] then 'Below M7Box'
+		when a.[Entry]<=b.[M7Box_Raw_top] and a.[Entry]>=b.[M7Box_raw_bottom] then 'Inside M7Box' --inclusive of open and close line
+	when a.Conf_Direction='No Conf' then 'No Conf'
+	end as [Entry relative to M7Box]
+into #tmp16
+from #tmp16_1 a
+left join #DailyInfo06 b
+on a.DR_date=b.DR_date and a.[Session]=b.[Session]
+
+Select  * from #tmp16 where [Session]='RDR' order by DR_Date desc
+Select top 10 * from 
+
+
+--need refine!!!!!!!!
+--Summarize the data
+
+--overall
+
+
+drop table if exists #tmp17_1
+Select 
+	[Session],	
+	Outcome, count(DR_date) as Tradecount,
+	sum(RR) as RR 
+	into #tmp17_1
+	from #tmp16 
+group by 
+		[Session],Outcome 
+	
+
+
+drop table if exists #tmp19_1
+Select a.[Session], a.Outcome,a.Tradecount,b.DayswithEntry,a.RR
+	into #tmp19_1
+	from #tmp17_1 a
+	left join
+		(Select [Session],
+			sum(case when Outcome!='NoEntry' then Tradecount else 0 end) as DayswithEntry
+		from #tmp17_1
+		group by [Session]) b
+	on a.[Session]=b.[Session] 
+
+	Select * from #tmp19
+
+Select a.[Session],a.Outcome,a.Tradecount,a.DayswithEntry,a.RR,
+		case when a.DayswithEntry<>0 then 
+			round((cast(a.Tradecount as float)/a.DayswithEntry)*100,2)
+		else 0
+		end as WinPercentage
+from #tmp19_1 a
+order by a.[Session]
+
+
+
+
+drop table if exists #tmp17
+Select 
+	[Session],	
+	case format(DR_date,'ddd') 
+		when 'Mon' then 1
+		when 'Tue' then 2
+		when 'Wed' then 3
+		when 'Thu' then 4
+		when 'Fri' then 5
+		when 'Sat' then 6
+		when 'Sun' then 7
+	end as DoW,
+	Outcome, count(DR_date) as Tradecount,
+	sum(RR) as RR 
+	into #tmp17
+	from #tmp16 
+group by 
+		[Session], format(DR_date,'ddd'), Outcome 
+	order by 
+		case format(DR_date,'ddd') 
+		when 'Mon' then 1
+		when 'Tue' then 2
+		when 'Wed' then 3
+		when 'Thu' then 4
+		when 'Fri' then 5
+		when 'Sat' then 6
+		when 'Sun' then 7
+	end
+
+	Select * from #tmp17 where DoW=7
+
+drop table if exists #tmp19
+Select a.[Session], a.DoW,a.Outcome,a.Tradecount,b.DayswithEntry,a.RR
+	into #tmp19
+	from #tmp17 a
+	left join
+		(Select [Session], Dow, 
+			sum(case when Outcome!='NoEntry' then Tradecount else 0 end) as DayswithEntry
+		from #tmp17
+		group by [Session], Dow) b
+	on a.[Session]=b.[Session] and a.[DoW]=b.[DoW]
+
+	Select * from #tmp19
+
+Select a.[Session], a.DoW,a.Outcome,a.Tradecount,a.DayswithEntry,a.RR,
+		case when a.DayswithEntry<>0 then 
+			round((cast(a.Tradecount as float)/a.DayswithEntry)*100,2)
+		else 0
+		end as WinPercentage
+	  -- (a.Tradecount/nullif(a.DayswithEntry,0)) as WinPercentage
+		--round(a.Tradecount/nullif(a.DayswithEntry,0)*100,2) as WinPercentage
+from #tmp19 a
