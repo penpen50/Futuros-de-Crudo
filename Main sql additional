@@ -275,46 +275,48 @@ Select top 10 * from
 
 --overall
 
-
+--Analyiss 1
+--create table with win% by session by SD Entry
 drop table if exists #tmp17_1
 Select 
-	[Session],	
+	[Session],	[Entry_SD]
 	Outcome, count(DR_date) as Tradecount,
 	sum(RR) as RR 
 	into #tmp17_1
 	from #tmp16 
 group by 
-		[Session],Outcome 
+		[Session],[Entry_SD],Outcome 
 	
 
 
 drop table if exists #tmp19_1
-Select a.[Session], a.Outcome,a.Tradecount,b.DayswithEntry,a.RR
+Select a.[Session],a.[Entry_SD], a.Outcome,a.Tradecount,b.DayswithEntry,a.RR
 	into #tmp19_1
 	from #tmp17_1 a
 	left join
-		(Select [Session],
+		(Select [Session],[Entry_SD],
 			sum(case when Outcome!='NoEntry' then Tradecount else 0 end) as DayswithEntry
 		from #tmp17_1
-		group by [Session]) b
-	on a.[Session]=b.[Session] 
+		group by [Session],[Entry_SD]) b
+	on a.[Session]=b.[Session] and a.[Entry_SD]=b.[Entry_SD] 
 
 	Select * from #tmp19
 
-Select a.[Session],a.Outcome,a.Tradecount,a.DayswithEntry,a.RR,
+Select a.[Session],a.[Entry_SD], a.Outcome,a.Tradecount,a.DayswithEntry,a.RR,
 		case when a.DayswithEntry<>0 then 
 			round((cast(a.Tradecount as float)/a.DayswithEntry)*100,2)
 		else 0
 		end as WinPercentage
 from #tmp19_1 a
-order by a.[Session]
+order by a.[Session],a.[Entry_SD]
 
-
+--Analysis 2
+--create table with win% by Session by Entry SD
 
 
 drop table if exists #tmp17
 Select 
-	[Session],	
+	[Session],	[Entry_SD],
 	case format(DR_date,'ddd') 
 		when 'Mon' then 1
 		when 'Tue' then 2
@@ -329,7 +331,7 @@ Select
 	into #tmp17
 	from #tmp16 
 group by 
-		[Session], format(DR_date,'ddd'), Outcome 
+		[Session], [Entry_SD],format(DR_date,'ddd'), Outcome 
 	order by 
 		case format(DR_date,'ddd') 
 		when 'Mon' then 1
@@ -344,19 +346,19 @@ group by
 	Select * from #tmp17 where DoW=7
 
 drop table if exists #tmp19
-Select a.[Session], a.DoW,a.Outcome,a.Tradecount,b.DayswithEntry,a.RR
+Select a.[Session],a.[Entry_SD], a.DoW,a.Outcome,a.Tradecount,b.DayswithEntry,a.RR
 	into #tmp19
 	from #tmp17 a
 	left join
-		(Select [Session], Dow, 
+		(Select [Session], [Entry_SD],Dow, 
 			sum(case when Outcome!='NoEntry' then Tradecount else 0 end) as DayswithEntry
 		from #tmp17
-		group by [Session], Dow) b
-	on a.[Session]=b.[Session] and a.[DoW]=b.[DoW]
+		group by [Session],[Entry_SD], Dow) b
+	on a.[Session]=b.[Session] and a.[Entry_SD]=b.[Entry_SD] and a.[DoW]=b.[DoW]
 
 	Select * from #tmp19
 
-Select a.[Session], a.DoW,a.Outcome,a.Tradecount,a.DayswithEntry,a.RR,
+Select a.[Session],a.[Entry_SD], a.DoW,a.Outcome,a.Tradecount,a.DayswithEntry,a.RR,
 		case when a.DayswithEntry<>0 then 
 			round((cast(a.Tradecount as float)/a.DayswithEntry)*100,2)
 		else 0
