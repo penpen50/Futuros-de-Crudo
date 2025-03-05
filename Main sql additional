@@ -366,3 +366,38 @@ Select a.[Session],a.[Entry_SD], a.DoW,a.Outcome,a.Tradecount,a.DayswithEntry,a.
 	  -- (a.Tradecount/nullif(a.DayswithEntry,0)) as WinPercentage
 		--round(a.Tradecount/nullif(a.DayswithEntry,0)*100,2) as WinPercentage
 from #tmp19 a
+
+--Analysis 3
+--create table with win% by session by SD Entry
+drop table if exists #tmp17_3
+Select 
+	[Session],	[Entry_SD],[Entry relative to M7Box],
+	Outcome, count(DR_date) as Tradecount,
+	sum(RR) as RR 
+	into #tmp17_3
+	from #tmp16 
+group by 
+		[Session],[Entry_SD],[Entry relative to M7Box],Outcome 
+	
+
+
+drop table if exists #tmp19_3
+Select a.[Session],a.[Entry_SD],a.[Entry relative to M7Box], a.Outcome,a.Tradecount,b.DayswithEntry,a.RR
+	into #tmp19_3
+	from #tmp17_3 a
+	left join
+		(Select [Session],[Entry_SD],[Entry relative to M7Box],
+			sum(case when Outcome!='NoEntry' then Tradecount else 0 end) as DayswithEntry
+		from #tmp17_3
+		group by [Session],[Entry_SD]) b
+	on a.[Session]=b.[Session] and a.[Entry_SD]=b.[Entry_SD]  and a.[Entry relative to M7Box],=b.[Entry relative to M7Box]
+
+	Select * from #tmp19
+
+Select a.[Session],a.[Entry_SD],a.[Entry relative to M7Box], a.Outcome,a.Tradecount,a.DayswithEntry,a.RR,
+		case when a.DayswithEntry<>0 then 
+			round((cast(a.Tradecount as float)/a.DayswithEntry)*100,2)
+		else 0
+		end as WinPercentage
+from #tmp19_3 a
+order by a.[Session],a.[Entry_SD]
