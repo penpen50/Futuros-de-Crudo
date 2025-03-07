@@ -1,0 +1,187 @@
+/************************/
+--For RBC
+--It will be base on box color
+
+Select top 100 * from #tmp7
+drop table if exists #tmp8
+
+--Declare @SD_Entry decimal(4,2);
+Declare @SD_Target decimal(4,2);
+Declare @SD_SL decimal(4,2);
+Declare @plus_tick decimal(4,2);
+
+set @SD_Target=1.0;
+set @SD_SL=-0.9;
+set @plus_tick=3;
+--set @SD_Entry=(Select[SessionClose] from #tmp7);
+
+--Entry must be in the body of the session
+--Entry must be before confirmation, otherwise no entry
+
+Select a.*,[M7Box_Color_Close_SD] as [Entry_SD],
+        [SessionClose] as [Entry],
+        case when Timeonly in ('20:30:00','04:00:00','10:30:00') then 1 else 0 end as [Qualify_Entry_Time],
+        [IDR_High]+(@SD_SL*10*[SD_Size])-(0.01*@plus_tick) as [SL],
+        case when [Low] <=([IDR_high]+(@SD_SL*10*[SD_Size])-(0.01*@plus_tick)) then 1 else 0 end as [SL_hit],
+        [IDR_high]+(@SD_Target*10*SD_Size) as [TP],
+        case when [High]>=([IDR_high]+(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
+into #tmp8
+from #tmp7 a
+        where [Session] in ('ADR','ODR','RDR') and DR_Box='Other' and [Box Color] in ('Green') and [M7Box_Color_Close_SD]>=-0.8
+union all 
+Select a.*,
+        [SessionClose] as [Entry],[M7Box_Color_Close_SD] as [Entry_SD],
+        case when Timeonly in ('20:30:00','04:00:00','10:30:00') then 1 else 0 end as [Qualify_Entry_Time],
+        [IDR_Low]-(@SD_SL*10*[SD_Size])+(0.01*@plus_tick) as [SL],
+        case when [High] >=([IDR_Low]-(@SD_SL*10*[SD_Size])+(0.01*@plus_tick)) then 1 else 0 end as [SL_hit],
+        [IDR_Low]-(@SD_Target*10*SD_Size) as [TP],
+        case when [Low]<=([IDR_Low]-(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
+from #tmp7 a
+        where [Session] in ('ADR','ODR','RDR') and DR_Box='Other' and [Box Color] in ('Red') and [M7Box_Color_Close_SD]>=-0.8
+union all 
+Select a.*,[M7Box_Color_Close_SD] as [Entry_SD],
+        [SessionClose] as [Entry],
+        case when Timeonly in ('20:30:00','04:00:00','10:30:00') then 1 else 0 end as [Qualify_Entry_Time],
+        [SessionClose]+(10*[SD_Size])-(0.01*@plus_tick) as [SL],--if close below -0.8, then use 1SD+3tick as SL
+        case when [Low] <=([SessionClose]+(10*[SD_Size])-(0.01*@plus_tick)) then 1 else 0 end as [SL_hit],
+        [IDR_High]+(@SD_Target*10*SD_Size) as [TP],
+        case when [High]>=([IDR_High]+(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
+from #tmp7 a
+where [Session] in ('ADR','ODR','RDR') and DR_Box='Other' and [Box Color] in ('Green') and [M7Box_Color_Close_SD]<-0.8
+union all 
+Select a.*,[M7Box_Color_Close_SD] as [Entry_SD],
+        [SessionClose] as [Entry],
+        case when Timeonly in ('20:30:00','04:00:00','10:30:00') then 1 else 0 end as [Qualify_Entry_Time],
+        [SessionClose]-(@SD_SL*10*[SD_Size])+(0.01*@plus_tick) as [SL],--if close below -0.8, then use 1SD+3tick as SL
+        case when [High]>=([SessionClose]-(@SD_SL*10*[SD_Size])+(0.01*@plus_tick)) then 1 else 0 end as [SL_hit],
+        [IDR_Low]-(@SD_Target*10*SD_Size) as [TP],
+        case when [Low]<=([IDR_Low]-(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
+from #tmp7 a
+where [Session] in ('ADR','ODR','RDR') and DR_Box='Other' and [Box Color] in ('Red') and [M7Box_Color_Close_SD]<-0.8
+
+
+/***check***/
+select DR_date, [Session],[SessionClose], [Low] as [SL_temp] 
+into #tmp8_SLtemp from #tmp7 
+where [Box Color] in ('Green') and Timeonly in ('20:25:00','03:55:00','10:25:00') 
+group by DR_date, [Session],[SessionClose],[Low] 
+union all 
+select DR_date, [Session],[SessionClose],[High] as [SL_temp] 
+from #tmp7 where [Box Color] in ('Red') and Timeonly in ('20:25:00','03:55:00','10:25:00') 
+group by DR_date, [Session],[SessionClose],[High]
+
+
+/*RBC backtest*/
+-- Entry once box close happens, at 10:30
+-- First, make sure the temporary table exists
+
+
+drop table if exists #tmp8_SLtemp
+Select DR_date, [Session],[SessionClose], [Box Color] ,
+        [Low] as [SL_temp],
+        abs([SessionClose]-[Low]) as [Diff],
+        case when abs([SessionClose]-[Low]) <0.1 then [SessionClose]-0.1 else [Low] end as [StopPrice]
+        into #tmp8_SLtemp 
+        from #tmp7 
+where [Box Color] in ('Green') and Timeonly in ('20:25:00','03:55:00','10:25:00') 
+group by DR_date, [Session],[SessionClose], [Low], [Box Color] 
+union all 
+Select DR_date, [Session],[SessionClose],  [Box Color],
+        [High] as [SL_temp],
+        abs([SessionClose]-[High]) as [Diff],
+        case when abs([SessionClose]-[High]) < 0.1 then [SessionClose]+0.1 else [High] end as [StopPrice]
+        from #tmp7 
+        where [Box Color] in ('Red') and Timeonly in ('20:25:00','03:55:00','10:25:00') 
+group by DR_date, [Session],[SessionClose],[High], [Box Color]
+
+Select top 10* from #tmp8_SLtemp order by DR_date desc
+
+-- Create the final table with the necessary calculations
+drop table if exists #tmp7_SL
+Select a.*,b.[StopPrice]
+into #tmp7_SL
+from #tmp7 a
+left join
+#tmp8_SLtemp b
+on a.DR_Date=b.DR_Date and a.[Session]=b.[Session]
+
+Select top 10* from #tmp7_SL
+
+--Declare @SD_Entry decimal(4,2);
+Declare @SD_Target decimal(4,2);
+--Declare @SD_SL decimal(4,2);
+Declare @plus_tick decimal(4,2);
+
+set @SD_Target=1.0;
+--set @SD_SL=-0.9;
+set @plus_tick=3;
+Select top 100 * from #tmp8
+drop table if exists #tmp8
+Select a.*,[M7Box_Color_Close_SD] as [Entry_SD],
+        [SessionClose] as [Entry],
+        case when Timeonly in ('20:30:00','04:00:00','10:30:00') then 1 else 0 end as [Qualify_Entry_Time],
+        [StopPrice]-(0.01*@plus_tick) as [SL],
+        case when [Low] <=([StopPrice]-(0.01*@plus_tick)) then 1 else 0 end as [SL_hit],
+        [IDR_high]+(@SD_Target*10*SD_Size) as [TP],
+        case when [High]>=([IDR_high]+(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
+into #tmp8
+from #tmp7_SL a
+        where [Session] in ('ADR','ODR','RDR') and DR_Box='Other' and [Box Color] in ('Green') 
+union all 
+Select a.*,[M7Box_Color_Close_SD] as [Entry_SD],
+        [SessionClose] as [Entry],
+        case when Timeonly in ('20:30:00','04:00:00','10:30:00') then 1 else 0 end as [Qualify_Entry_Time],
+        [StopPrice]+(0.01*@plus_tick) as [SL],
+        case when [High] >=[StopPrice]+(0.01*@plus_tick) then 1 else 0 end as [SL_hit],
+        [IDR_Low]-(@SD_Target*10*SD_Size) as [TP],
+        case when [Low]<=([IDR_Low]-(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
+from #tmp7_SL a
+        where [Session] in ('ADR','ODR','RDR') and DR_Box='Other' and [Box Color] in ('Red') 
+
+/*******/
+--RBC test
+--It will be base on box color
+--Entry Mid M7 bix
+--SL Session Open + 3 ticks
+-(template when Entry SD need to be calculated)
+
+-- Create the table with the necessary calculations
+drop table if exists #tmp7_SL
+Select a.*,b.[M7_0.5] as [EntryPrice], a.[SessionOpen] as [StopPrice]
+into #tmp7_SL
+from #tmp7 a
+left join
+#DailyInfo06 b
+on a.DR_Date=b.DR_Date and a.[Session]=b.[Session]
+
+Select top 10* from #tmp7_SL
+
+
+Declare @SD_Target decimal(4,2);
+Declare @plus_tick decimal(4,2);
+
+set @SD_Target=1.0;
+--set @SD_SL=-0.9;
+set @plus_tick=3;
+
+drop table if exists #tmp8_1
+Select a.*,convert(decimal(10,2),((IDR_High-[EntryPrice])*-0.1/SD_Size) as [Entry_SD],
+        [EntryPrice] as [Entry],
+        case when [EntryPrice] between [Low] and [High] then 1 else 0 end as [Qualify_Entry_Time],
+        [StopPrice]-(0.01*@plus_tick) as [SL],
+        case when [Low] <=([StopPrice]-(0.01*@plus_tick)) then 1 else 0 end as [SL_hit],
+        [IDR_high]+(@SD_Target*10*SD_Size) as [TP],
+        case when [High]>=([IDR_high]+(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
+into #tmp8
+from #tmp7_SL a
+        where [Session] in ('ADR','ODR','RDR') and DR_Box='Other' and [Box Color] in ('Green') 
+union all 
+Select a.*,convert(decimal(10,2),((IDR_Low-[EntryPrice])*0.1/SD_Size) as [Entry_SD],
+        [EntryPrice] as [Entry],
+        case when [EntryPrice] between [Low] and [High] then 1 else 0 end as [Qualify_Entry_Time],
+        [StopPrice]+(0.01*@plus_tick) as [SL],
+        case when [High] >=[StopPrice]+(0.01*@plus_tick) then 1 else 0 end as [SL_hit],
+        [IDR_Low]-(@SD_Target*10*SD_Size) as [TP],
+        case when [Low]<=([IDR_Low]-(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
+from #tmp7_SL a
+        where [Session] in ('ADR','ODR','RDR') and DR_Box='Other' and [Box Color] in ('Red') 
