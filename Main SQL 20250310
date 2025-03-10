@@ -94,7 +94,7 @@ Select * from #tmp2_1 where DoW=7 order by T_DateTime
 drop table if exists #tmp3
 --Select a.DR_Date,a. [Session] from #tmp2 a group by a.DR_Date,a. [Session] order by a.DR_Date
 
-Select a.DR_Date, a.[Session], b.[Open], c.[Close], j.[ExitPrice], dd.DR_High, ee.IDR_High, dd.DR_Low, ee.IDR_Low
+Select a.DR_Date, a.[Session], b.[Open] as [M7BoxOpen], c.[Close] as [M7BoxClose], j.[ExitPrice], dd.DR_High, ee.IDR_High, dd.DR_Low, ee.IDR_Low
 	into #tmp3
 	from #tmp2 a
 left join
@@ -189,17 +189,17 @@ Select e.*,aaaa.First_Conf_T_DateTime, aaaa.First_Conf_Time, bbbb.Long_Conf_T_Da
 
 	--DR Box Color
 	case 
-		 when ff.[Close]>ff.[Open] then 'Green'
-		 when ff.[Close]<ff.[Open] then 'Red'
+		 when ff.[M7BoxClose]>ff.[M7BoxOpen] then 'Green'
+		 when ff.[M7BoxClose]<ff.[M7BoxOpen] then 'Red'
 		 else 'Grey' end as [Box Color],
-		 ff.[Open], ff.[Close], ff.[ExitPrice],ff.[DR_High], ff.[IDR_High], ff.[DR_Low], ff.[IDR_Low],
+		 ff.[M7BoxOpen], ff.[M7BoxClose], ff.[ExitPrice],ff.[DR_High], ff.[IDR_High], ff.[DR_Low], ff.[IDR_Low],
 
 	--tick and SD size
 	convert (decimal(10,3), (ff.IDR_High-ff.IDR_Low)/10) as SD_Size, --dollar value per SD
 	convert (decimal(10,2), (ff.IDR_High-ff.IDR_Low) *10) as SD_tick_Size,
---M7 Box tick Sizw
-	convert (decimal(10,3), abs(ff.[Close]-ff.[Open])/10) as M7Box_SD_Size, --dollar value per SD
-	convert (decimal(10,2), abs(ff.[Close]-ff.[Open]) *10) as M7Box_SD_tick_Size
+--M7 Box tick Size
+	convert (decimal(10,3), abs(ff.[M7BoxClose]-ff.[M7BoxOpen])/10) as M7Box_SD_Size, --dollar value per SD
+	convert (decimal(10,2), abs(ff.[M7BoxClose]-ff.[M7BoxOpen]) *10) as M7Box_SD_tick_Size
 into #tmp5
 from
 	(Select ee.DR_Date, ee.[Session]
@@ -280,17 +280,17 @@ Select a.*,
 	end as [DR_Low_SD],
 
 	case 
-		when Conf_Direction in ('Long') then convert(decimal(10,2),((IDR_High-[Open])*-0.1/SD_Size))
-		when Conf_Direction in ('Short') then convert(decimal(10,2),((IDR_Low-[Open])*0.1/SD_Size))
-		when Conf_Direction in ('No Conf') and [Box Color] in ('Green') then convert(decimal(10,2),((IDR_High-[Open])*-0.1/SD_Size))
-		when Conf_Direction in ('No Conf') and [Box Color] in ('Red') then convert(decimal(10,2),((IDR_Low-[Open])*0.1/SD_Size)) 
+		when Conf_Direction in ('Long') then convert(decimal(10,2),((IDR_High-[M7BoxOpen])*-0.1/SD_Size))
+		when Conf_Direction in ('Short') then convert(decimal(10,2),((IDR_Low-[M7BoxOpen])*0.1/SD_Size))
+		when Conf_Direction in ('No Conf') and [Box Color] in ('Green') then convert(decimal(10,2),((IDR_High-[M7BoxOpen])*-0.1/SD_Size))
+		when Conf_Direction in ('No Conf') and [Box Color] in ('Red') then convert(decimal(10,2),((IDR_Low-[M7BoxOpen])*0.1/SD_Size)) 
 	end as [M7Box_Open_SD],
 
 	case 
-	 	 when Conf_Direction in ('Long') then convert(decimal(10,2),((IDR_High-[Close])*-0.1/SD_Size))
-		 when Conf_Direction in ('Short') then convert(decimal(10,2),((IDR_Low-[Close])*0.1/SD_Size))
-		 when Conf_Direction in ('No Conf') and [Box Color] in ('Green') then convert(decimal(10,2),((IDR_High-[Close])*-0.1/SD_Size))
-		 when Conf_Direction in ('No Conf') and [Box Color] in ('Red') then convert(decimal(10,2),((IDR_Low-[Close])*0.1/SD_Size))
+	 	 when Conf_Direction in ('Long') then convert(decimal(10,2),((IDR_High-[M7BoxClose])*-0.1/SD_Size))
+		 when Conf_Direction in ('Short') then convert(decimal(10,2),((IDR_Low-[M7BoxClose])*0.1/SD_Size))
+		 when Conf_Direction in ('No Conf') and [Box Color] in ('Green') then convert(decimal(10,2),((IDR_High-[M7BoxClose])*-0.1/SD_Size))
+		 when Conf_Direction in ('No Conf') and [Box Color] in ('Red') then convert(decimal(10,2),((IDR_Low-[M7BoxClose])*0.1/SD_Size))
 	end as [M7Box_Close_SD],
 
 	--for RBC
@@ -300,17 +300,17 @@ Select a.*,
 	end as [BoxSD0],
 
 	--Determine open and close by box color for RBC backtesting  --2
-	case when [Box Color] in ('Green') then convert(decimal(10,2),((IDR_High-[Open])*-0.1/SD_Size))
-		 when [Box Color] in ('Red') then convert(decimal(10,2),((IDR_Low-[Open])*0.1/SD_Size))
+	case when [Box Color] in ('Green') then convert(decimal(10,2),((IDR_High-[M7BoxOpen])*-0.1/SD_Size))
+		 when [Box Color] in ('Red') then convert(decimal(10,2),((IDR_Low-[M7BoxOpen])*0.1/SD_Size))
 	end as [M7Box_Color_Open_SD],
 
-	case when [Box Color] in ('Green') then convert(decimal(10,2),((IDR_High-[Close])*-0.1/SD_Size))
-		 when [Box Color] in ('Red') then convert(decimal(10,2),((IDR_Low-[Close])*0.1/SD_Size))
+	case when [Box Color] in ('Green') then convert(decimal(10,2),((IDR_High-[M7BoxClose])*-0.1/SD_Size))
+		 when [Box Color] in ('Red') then convert(decimal(10,2),((IDR_Low-[M7BoxClose])*0.1/SD_Size))
 	end as [M7Box_Color_Close_SD],
 
 	--To determine M7 box position, use Open and close line as if it is always long
-	convert(decimal(10,2),((IDR_High-[Open])*-0.1/SD_Size)) as [Raw_OpenSD],
-	convert(decimal(10,2),((IDR_High-[Close])*-0.1/SD_Size)) as [Raw_CloseSD],
+	convert(decimal(10,2),((IDR_High-[M7BoxOpen])*-0.1/SD_Size)) as [Raw_OpenSD],
+	convert(decimal(10,2),((IDR_High-[M7BoxClose])*-0.1/SD_Size)) as [Raw_CloseSD],
 
 	----Where is 0.5SD
 	convert(decimal(10,2),(IDR_High-SD_Size*5)) as [SD-05],
@@ -353,8 +353,8 @@ Select
 	[False DateTime],
 	[False Time],
 	[Box Color],
-	[Open],
-	[Close],
+	[M7BoxOpen],
+	[M7BoxClose],
 	[ExitPrice],
 	DR_High,
 	IDR_High,
@@ -393,8 +393,8 @@ Select a.*,
 	   b.[False DateTime],
 	   b.[False Time],
 	   b.[Box Color],
-	   b.[Open] as [M7BoxOpen],
-	   b.[Close] as [M7BoxClose],	
+	   b.[M7BoxOpen],
+	   b.[M7BoxClose],	
 	   b.[ExitPrice],
 	   b.DR_high,
 	   b.IDR_High,
@@ -458,6 +458,7 @@ Select
 	[Box Color],
 	M7BoxOpen,
 	M7BoxClose,
+	[ExitPrice],
 	DR_high,
 	IDR_high,
 	DR_Low,
@@ -606,7 +607,7 @@ on a.DR_Date=b.DR_Date
 --'With' clause must run as a standalone block
 --cannot contain comments inside the block
 
-Drop table if exists #Broken01
+Drop table if exists #Broken01;
 With ADRBrokenTimes as (
 	Select
 		DR_date,
@@ -696,8 +697,8 @@ Select
 	[False DateTime],
 	[False Time],
 	[Box Color],
-	[Open],
-	[Close],
+	[M7BoxOpen],
+	[M7BoxClose],
 	DR_High,
 	IDR_High,
 	DR_Low,
@@ -1121,7 +1122,7 @@ on a.DR_Date=e.DR_Date and a.[Session]=e.[Session]
 --Red Box: Raw Close SD is always smaller (below) then Raw Open SD
 --Red Box mid point=Close+(Open-Close)/2
 
-drop table if exists #DailyInfo05
+drop table if exists #DailyInfo05;
 With Raw_Mid as (
 	Select a.*,
 		case 
@@ -1220,25 +1221,25 @@ Select a.*,
 	((a.[IDR_Low]-a.[DR_Low])/a.SD_tick_Size)*10 as DR_Low_thickness_SD, --9
 	b.T_DateTime as [RBC_M7Box_Retracement_DateTime], b.Timeonly as [RBC_M7Box_Retracement_Time],
 	case 
-		when a.[Box Color] in ('Green') then convert(decimal(10,2),((a.[Close]-b.RBC_M7Box_retracement)*-0.1/a.M7Box_SD_Size))
-		when a.[Box Color] in ('Red') then convert(decimal(10,2),((a.[Close]-b.RBC_M7Box_retracement)*0.1/a.M7Box_SD_Size))
+		when a.[Box Color] in ('Green') then convert(decimal(10,2),((a.[M7BoxClose]-b.RBC_M7Box_retracement)*-0.1/a.M7Box_SD_Size))
+		when a.[Box Color] in ('Red') then convert(decimal(10,2),((a.[M7BoxClose]-b.RBC_M7Box_retracement)*0.1/a.M7Box_SD_Size))
 	end as RBC_M7Box_retracement_SD,
 --Wick --6
 	case 
-		when a.[Box Color] in ('Green') and RBC_M7Box_retracement>=[Open] then 'RBC M7 Box not broken'
-		when a.[Box Color] in ('Red') and RBC_M7Box_retracement<=[Open] then 'RBC M7 Box not broken'
+		when a.[Box Color] in ('Green') and RBC_M7Box_retracement>=[M7BoxOpen] then 'RBC M7 Box not broken'
+		when a.[Box Color] in ('Red') and RBC_M7Box_retracement<=[M7BoxOpen] then 'RBC M7 Box not broken'
 		when a.[Box Color] in ('Grey') then 'No Box Color'
 	else 'RBC M7 Box Broken' end as RBC_M7Box_Broken,
 --by candle close --6
 	case 
-		when a.[Box Color] in ('Green') and c.RBC_M7Box_Close_ret>=[Open] then 'RBC M7Box not broken (Close)'
-		when a.[Box Color] in ('Red') and c.RBC_M7Box_Close_ret<=[Open] then 'RBC M7Box not broken (Close)'
+		when a.[Box Color] in ('Green') and c.RBC_M7Box_Close_ret>=[M7BoxOpen] then 'RBC M7Box not broken (Close)'
+		when a.[Box Color] in ('Red') and c.RBC_M7Box_Close_ret<=[M7BoxOpen] then 'RBC M7Box not broken (Close)'
 		when a.[Box Color] in ('Grey') then 'No Box Color'
 	else 'RBC M7Box Broken (Close)' end as RBC_M7Box_Broken_Close,
 
 case 
-		when a.[Box Color] in ('Green') and c.RBC_M7Box_Close_ret>=[Close] then 'RBC always close outside M7Box'--6
-		when a.[Box Color] in ('Red') and c.RBC_M7Box_Close_ret<=[Close] then 'RBC always close outside M7Box'--6
+		when a.[Box Color] in ('Green') and c.RBC_M7Box_Close_ret>=[M7BoxClose] then 'RBC always close outside M7Box'--6
+		when a.[Box Color] in ('Red') and c.RBC_M7Box_Close_ret<=[M7BoxClose] then 'RBC always close outside M7Box'--6
 		when a.[Box Color] in ('Grey') then 'No Box Color'
 	else 'RBC Close inside M7Box' end as RBC_M7Box_CloseOutside
 into #DailyInfo06_3 --12
@@ -1271,13 +1272,13 @@ on a.DR_date=b.DR_Date
 
 --Select top 100* from #DailyInfo06_1
 
-drop table if exists #DailyInfo06_2
+drop table if exists #DailyInfo06_2;
 
 With InitialBuckets As( --16
 	Select
 		*,
-    CASE WHEN [Open] > [Close] THEN [Open] ELSE [Close] END AS [M7Box_Raw_top],
-    CASE WHEN [Open] < [Close] THEN [Open] ELSE [Close] END AS [M7Box_Raw_bottom],
+    CASE WHEN [M7BoxOpen] > [M7BoxClose] THEN [M7BoxOpen] ELSE [M7BoxClose] END AS [M7Box_Raw_top],
+    CASE WHEN [M7BoxOpen] < [M7BoxClose] THEN [M7BoxOpen] ELSE [M7BoxClose] END AS [M7Box_Raw_bottom],
 	Floor(DR_High_SD*10)/10+0.1 as DR_High_SD_upper,
 	Floor(DR_High_SD*10)/10 as DR_High_SD_lower,
 
@@ -1376,8 +1377,8 @@ Select
 	 when Conf_Direction = 'No Conf' then 'No Conf'
 	else 'Not Match' end as [Box_Color_match_Conf_direction],--6
 
-	[Open],
-	[Close],
+	[M7BoxOpen],
+	[M7BoxClose],
 	[DR_High],
 	[IDR_High],
 	[DR_Low],
@@ -1617,7 +1618,7 @@ Select [Session],[TF Day],
 		case when Max_Ret_SD < M7Box_Close_SD then 'Below M7Box' 
 			 when Max_Ret_SD < M7Box_Open_SD and Max_Ret_SD >= M7Box_Close_SD then 'Inside M7Box' 
 			 when Max_Ret_SD >= M7Box_Open_SD then 'Above M7Box' end order by [Session]
-
+drop table if exists [dbo].tmp7 
 Select * into [Futures].[dbo].tmp7 from #tmp7
 /****************************************************************************************************************************************************************/
 /************Backtesting************/
@@ -2075,7 +2076,7 @@ on a.DR_date=b.DR_date and a.[Session]=b.[Session] and a.[Entry_SD]=b.[Entry_SD]
 order by DR_date desc
 
 Select * from #tmp9 order by DR_Date desc
-Select * from #tmp9 where DR_Date='2021-02-15' and [Session] in ('RDR')
+Select * from #tmp8 where DR_Date='2021-02-15' and [Session] in ('RDR')
 
 Drop table if exists #tmp8_2
 
@@ -2085,19 +2086,20 @@ from #tmp8 a
 left join #tmp9 b
 on a.DR_date=b.DR_date and a.[Session]=b.[Session] and a.[Entry_SD]=b.[Entry_SD]
 
+drop table if exists  #TPreach
 Select DR_date,[Session],[Entry_SD],
-	min(T_DateTime) as [TP_Reach_Time]
+	min(T_DateTime) as [TP_Reach_Time],ExitPrice
 into #TPreach
 from #tmp8_2
 where [TP_hit]=1 and T_DateTime>=FirstEntryTime
-group by DR_date,[session],[Entry_SD]
+group by DR_date,[session],[Entry_SD],ExitPrice
 
 --Create data set with First Entry Time, stopput time and TP reach time
 --Include dates with no entry
 
 drop table if exists #Result
 Select a.DR_date,a.[Session],a.Conf_Direction,a.[Box Color],a.[Entry_SD],
-	b.FirstEntryTime, b.Stop_Out_Time,c.[TP_Reach_Time]
+	b.FirstEntryTime, b.Stop_Out_Time,c.[TP_Reach_Time],c.[ExitPrice]
 into #Result
 from #tmp8 a
 left join #tmp9 b
@@ -2105,9 +2107,10 @@ on a.DR_date=b.DR_date and a.[Session]=b.[Session] and a.[Entry_SD]=b.[Entry_SD]
 left join #TPreach c
 on a.DR_date=c.DR_date and a.[Session]=c.[Session] and a.[Entry_SD]=c.[Entry_SD]
 group by a.DR_date,a.[Session],a.Conf_Direction,a.[Box Color],a.[Entry_SD],
-	b.FirstEntryTime, b.Stop_Out_Time,c.[TP_Reach_Time]
+	b.FirstEntryTime, b.Stop_Out_Time,c.[TP_Reach_Time],c.[ExitPrice]
 
 Select * from #Result where DR_Date='2021-02-15' and [Session] in ('RDR')
+Select * from #tmp8_2 where DR_Date='2021-02-15' and [Session] in ('RDR')
 
 --Determining if the entry is a sucess or fail
 drop table if exists #tmp13
