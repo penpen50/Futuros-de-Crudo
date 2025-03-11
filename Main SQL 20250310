@@ -1893,7 +1893,7 @@ from #tmp7 a
 left join
 #DailyInfo06 b
 on a.DR_Date=b.DR_Date and a.[Session]=b.[Session]
-
+Select top 10* from #tmp7
 Select top 10* from #tmp8_1
 
 Declare @SD_Target decimal(4,2);
@@ -2057,6 +2057,7 @@ drop table if exists #tmp8
 Select * into #tmp8 from #tmp8_1 
 drop table if exists #tmp9
 
+Select top 10* from #tmp9
 Select a.DR_date,a.[session],a.Conf_Direction,a.[Box Color],a.[Entry_SD],
            a.FirstEntryTime,
            b.Stop_Out_Time
@@ -2132,8 +2133,8 @@ Select * from #tmp13 where DR_Date='2021-02-15' and [Session] in ('RDR')
 Select a.*, 
     b.[Entry],
     b.[SL], 
-    b.[TP], 
-    COALESCE(c.[SessionClosePrice], d.[SessionClosePrice]) as [SessionClosePrice]
+    b.[TP] 
+	--b.[ExitPrice]  --  COALESCE(c.[SessionClosePrice], d.[SessionClosePrice]) as [SessionClosePrice]
 into #tmp14
 from #tmp13 a
 	left join (
@@ -2141,22 +2142,24 @@ from #tmp13 a
 		from #tmp8 
     group by DR_date, [session], [Entry_SD],[Entry], SL, TP) b
 	on a.DR_date = b.DR_date and a.[session] = b.[session] and a.[Entry_SD]=b.[Entry_SD]
-left join (
-    Select DR_date, [session], [Close] as [SessionClosePrice] 
-    from #tmp8
-    where Timeonly in ('01:55:00','08:25:00','15:55:00')
-    group by DR_date, [session], [Close]
-) c on a.DR_date = c.DR_date and a.[session] = c.[session] 
-left join (
-    Select DR_date, [session], [Close] as [SessionClosePrice] 
-    from #tmp8
-    where Timeonly in ('01:55:00','08:25:00','12:55:00')
-    group by DR_date, [session], [Entry_SD],[Entry], SL, TP, [Close]
-) d on a.DR_date = d.DR_date and a.[session] = d.[session] 
+--left join (
+--    Select DR_date, [session], [Close] as [SessionClosePrice] 
+--    from #tmp8
+--    where Timeonly in ('01:55:00','08:25:00','15:55:00')
+--    group by DR_date, [session], [Close]
+--) c on a.DR_date = c.DR_date and a.[session] = c.[session] 
+--left join (
+--    Select DR_date, [session], [Close] as [SessionClosePrice] 
+--    from #tmp8
+--    where Timeonly in ('01:55:00','08:25:00','12:55:00')
+--    group by DR_date, [session], [Entry_SD],[Entry], SL, TP, [Close]
+--) d on a.DR_date = d.DR_date and a.[session] = d.[session] 
 
 Select * from #tmp14 where DR_Date='2011-02-25' and [Session] in ('ADR')
 Select * from #tmp8 where DR_Date='2011-02-25' and [Session] in ('ADR')
 Select * from #tmp7 where DR_Date='2021-02-15' and [Session] in ('RDR')
+
+Select top 100 * from #tmp13
 --Calculate R  
 drop table if exists #tmp15
 Select DR_date,
@@ -2177,16 +2180,15 @@ Select DR_date,
     [Entry],
     SL,
     TP,
-    SessionClosePrice,
+    ExitPrice,
     case 
             when [Outcome]='No Entry' then 0
             when [Outcome]='Fail' then abs(Entry-SL)*-1
             when [Outcome]='Success' then abs(Entry-TP)
-            when [Outcome]='Exit' and Conf_Direction='Long' then (SessionClosePrice-[Entry])
-            when [Outcome]='Exit' and Conf_Direction='Short' then ([Entry]-SessionClosePrice)
+            when [Outcome]='Exit' and Conf_Direction='Long' then (ExitPrice-[Entry])
+            when [Outcome]='Exit' and Conf_Direction='Short' then ([Entry]-ExitPrice)
     end as [PL],
     convert(decimal(10,2),abs(([Entry]-TP)/([Entry]-SL))) as PotentialRR
-
 into #tmp15
 from #tmp14
 
@@ -2209,7 +2211,7 @@ from #tmp15 a
 
 Select * from #DailyInfo06 where DR_Date='2009-02-13'
 drop table if exists #tmp16
-Select a.*,b.[Open],b.[Close],
+Select a.*,b.[M7BoxOpen],b.[M7BoxClose],
 	case when a.Conf_Direction='Long' and a.[Entry]<b.[M7Box_Raw_bottom] then 'Below M7Box'
 		when a.Conf_Direction='Long' and a.[Entry]>b.[M7Box_Raw_top] then 'Above M7Box'
 		when a.Conf_Direction='Short' and a.[Entry]<b.[M7Box_Raw_bottom] then 'Above M7Box'
@@ -2225,6 +2227,9 @@ on a.DR_date=b.DR_date and a.[Session]=b.[Session]
 Select  * from #tmp16 where [Session]='RDR' order by DR_Date desc
 drop table if exists  [Futures].[dbo].[Retirement] 
 Select * into [Futures].[dbo].[Retirement] from #tmp16
+
+drop table if exists  [Futures].[dbo].[RBC_0.5SL] 
+Select * into [Futures].[dbo].[RBC_0.5SL]  from #tmp16
 
 --need refine!!!!!!!!
 --Summarize the data
