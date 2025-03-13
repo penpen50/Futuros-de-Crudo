@@ -1335,10 +1335,15 @@ With InitialBuckets As( --16
 	),
 	Buckets AS (
 	Select *,
-		M7Box_Raw_top-((M7Box_Raw_top-M7Box_Raw_bottom)*0.25) as [M7_0.25],
+	b.[Open] as [Conf_Candle_Open],
+	b.[Close] as [Conf_Candle_Close],
+	b.[High] as [Conf_Candle_High],
+		b.[Low] as [Conf_Candle_Low],	M7Box_Raw_top-((M7Box_Raw_top-M7Box_Raw_bottom)*0.25) as [M7_0.25],
 		M7Box_Raw_top-((M7Box_Raw_top-M7Box_Raw_bottom)*0.5) as [M7_0.5],
 		M7Box_Raw_top-((M7Box_Raw_top-M7Box_Raw_bottom)*0.75) as [M7_0.75]
 	from InitialBuckets
+left join #tmp1 b
+on First_Conf_T_DateTime=b.T_DateTime
 	)
 
 Select
@@ -1369,6 +1374,15 @@ Select
 	left(convert(varchar,[False DateTime],120),16) as [False DateTime],
 	left(convert(varchar,[False Time],108),5) as [False Time],
 
+[Conf_Candle_Open],--22
+[Conf_Candle_Close],
+[Conf_Candle_High],
+[Conf_Candle_Low],
+case
+	when [Conf_Direction]='Long' then [Conf_Candle_Close]-[DR_High]
+when [Conf_Direction]='Short' then [DR_Low]- [Conf_Candle_Close]
+	end as [Conf_tick_size]
+	
 	[Box Color],
 	case
 		when [Box color]='Green' and Conf_Direction = 'Long' then 'Match'
@@ -1566,10 +1580,10 @@ Select a.*,b.Event,c.Event as FOMC
 	into #DailyInfo06
 	from #DailyInfo06_2 a
 	left JOIN
-(Select * from [dbo].[CL_Events] where [Event]!='FOMC') b
+(Select * from [dbo].[CL_Events] where [Event]!='FOMC' group by [Date],[Event]) b
 on a.DR_Date=b.Date
 	left JOIN
-(Select * from [dbo].[CL_Events] where [Event]='FOMC') c
+(Select * from [dbo].[CL_Events] where [Event]='FOMC'group by [Date],[Event]) c --22
 on a.DR_Date=c.Date
 
 drop table if exists  Futures.dbo.CLDailyInfo
@@ -2211,7 +2225,7 @@ from #tmp15 a
 
 Select * from #DailyInfo06 where DR_Date='2009-02-13'
 drop table if exists #tmp16
-Select a.*,b.[M7BoxOpen],b.[M7BoxClose],
+Select a.*,b.[M7BoxOpen],b.[M7BoxClose],b.[M7BoxSize_Range],--22
 	case when a.Conf_Direction='Long' and a.[Entry]<b.[M7Box_Raw_bottom] then 'Below M7Box'
 		when a.Conf_Direction='Long' and a.[Entry]>b.[M7Box_Raw_top] then 'Above M7Box'
 		when a.Conf_Direction='Short' and a.[Entry]<b.[M7Box_Raw_bottom] then 'Above M7Box'
