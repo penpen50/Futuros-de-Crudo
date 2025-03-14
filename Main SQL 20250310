@@ -1588,8 +1588,44 @@ on a.DR_Date=c.Date
 
 drop table if exists  Futures.dbo.CLDailyInfo
 Select * into Futures.dbo.CLDailyInfo from #DailyInfo06
+/*******/--23
+
+/*Daily Analysis 1 ****/ --23
+--TF day by confirmation tick size
+
+--Create table with original numbers
+drop table if exists #Result
+Select 0.00 as [Conf_Candle_tick],[TF Day], count(DR_Date) as [Days],
+(Select count(DR_Date) from #DailyInfo06 where [Session]='RDR' and Conf_Direction!='No Conf') as Total,
+cast(round((count(DR_Date)*100.0/(Select count(DR_Date) from #DailyInfo06 where [Session]='RDR' and Conf_Direction!='No Conf')),0) as int) as [Percentage]
+into #Result
+from #DailyInfo06
+where [Session]='RDR' and Conf_Direction!='No Conf' group by [TF Day]
+
+--Create while loop
+Declare @conf_tick_size decimal(5,2)=0.02;
+Declare @step decimal(5,2)=0.01;
+Declare @max_tick_size decimal (5,2)=0.1
+
+While @conf_tick_size<=@max_tick_size
+Begin
+Insert into #Result
+
+Select @conf_tick_size as [Conf_Candle_tick],[TF Day], count(DR_Date) as [Days],
+(Select count(DR_Date) from #DailyInfo06 where [Session]='RDR' and Conf_Direction!='No Conf'and [Conf_tick_size]<=@conf_tick_size) as Total,
+cast(round((count(DR_Date)*100.0/(Select count(DR_Date) from #DailyInfo06 where [Session]='RDR' and Conf_Direction!='No Conf' and [Conf_tick_size]<=@conf_tick_size)),0) as int) as [Percentage]
+into #Result
+from #DailyInfo06
+where [Session]='RDR' and Conf_Direction!='No Conf' and [Conf_tick_size]<=@conf_tick_size
+group by [TF Day]
+
+set @conf_tick_size=@conf_tick_size+@step;
+end
+
+Select * from #Result
 
 
+/******/
 Select * from #tmp1 where TradingDateTime>='2008-08-31' and TradingDateTime<='2008-09-01'
 --Summaries --6
 Select [Session],RBC_M7Box_Broken,RBC_M7Box_Broken_Close,
