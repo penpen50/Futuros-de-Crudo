@@ -25,6 +25,7 @@ into #tmp1
 from  [dbo].[CL_5min_IndividualCon]  a
 
 --Select * from [dbo].[CL_5min_IndividualCon] where TradingDateTime='10/28/2024 18:05' and Volume=21
+--Select max([TradingDateTime]) from  [dbo].[CL_5min_IndividualCon]
 
 -- Create temp table with first Fridays since 2008
 drop table if exists #NFPDates
@@ -2382,7 +2383,7 @@ left join
 #DailyInfo06 b
 on a.DR_Date=b.DR_Date and a.[Session]=b.[Session]
 
-Select top 10* from #tmp7
+--Select top 10* from #tmp7
 
 Declare @SD_Target decimal(4,2);
 Declare @plus_tick decimal(4,2);
@@ -2620,29 +2621,30 @@ on a.DR_date=b.DR_date and a.[Session]=b.[Session] and a.[Entry_SD]=b.[Entry_SD]
 
 drop table if exists  #TPreach
 Select DR_date,[Session],[Entry_SD],
-	min(T_DateTime) as [TP_Reach_Time],ExitPrice
+	min(T_DateTime) as [TP_Reach_Time]--,ExitPrice
 into #TPreach
 from #tmp8_2
 where [TP_hit]=1 and T_DateTime>=FirstEntryTime
-group by DR_date,[session],[Entry_SD],ExitPrice
+group by DR_date,[session],[Entry_SD]--,ExitPrice
 
+Select top 10 * from #tmp8_2
 --Create data set with First Entry Time, stopput time and TP reach time
 --Include dates with no entry
 
 drop table if exists #Result
-Select a.DR_date,a.[Session],a.Conf_Direction,a.[Box Color],a.[Entry_SD],
-	b.FirstEntryTime, b.Stop_Out_Time,c.[TP_Reach_Time],c.[ExitPrice]
-into #Result
+Select a.DR_date,a.[Session],a.Conf_Direction,a.[Box Color],a.[Entry_SD],a.[ExitPrice],
+	b.FirstEntryTime, b.Stop_Out_Time,c.[TP_Reach_Time]
+	into #Result
 from #tmp8 a
 left join #tmp9 b
 on a.DR_date=b.DR_date and a.[Session]=b.[Session] and a.[Entry_SD]=b.[Entry_SD]
 left join #TPreach c
 on a.DR_date=c.DR_date and a.[Session]=c.[Session] and a.[Entry_SD]=c.[Entry_SD]
-group by a.DR_date,a.[Session],a.Conf_Direction,a.[Box Color],a.[Entry_SD],
-	b.FirstEntryTime, b.Stop_Out_Time,c.[TP_Reach_Time],c.[ExitPrice]
+group by a.DR_date,a.[Session],a.Conf_Direction,a.[Box Color],a.[Entry_SD],a.[ExitPrice],
+	b.FirstEntryTime, b.Stop_Out_Time,c.[TP_Reach_Time]
 
-Select * from #Result where DR_Date='2021-02-15' and [Session] in ('RDR')
-Select * from #tmp8_2 where DR_Date='2021-02-15' and [Session] in ('RDR')
+Select * from #Result where DR_Date='2023-02-15' and [Session] in ('RDR')
+Select * from #tmp8_2 where DR_Date='2023-02-15' and [Session] in ('RDR')
 
 --Determining if the entry is a sucess or fail
 drop table if exists #tmp13
@@ -2659,12 +2661,12 @@ Select a.*,
 from #Result a
 order by DR_date desc
 
---Select * from #tmp13 where DR_Date='2021-02-15' and [Session] in ('RDR')
+--Select * from #tmp13 where DR_Date>'2025-02-15' and [Session] in ('RDR')
 drop table if exists #tmp14
 Select a.*, 
     b.[Entry],
     b.[SL], 
-    b.[TP] 
+    b.[TP]
 	--b.[ExitPrice]  --  COALESCE(c.[SessionClosePrice], d.[SessionClosePrice]) as [SessionClosePrice]
 into #tmp14
 from #tmp13 a
@@ -2716,8 +2718,8 @@ Select top 100 * from #tmp13
 drop table if exists #tmp15;
 With EntryBuckets as (
 	Select *,
-		Floor([Entry_SD]*10)/10+0.1 as DR_High_SD_upper,
-		Floor([Entry_SD]*10)/10 as DR_High_SD_lower
+		Floor([Entry_SD]*10)/10+0.1 as Entry_SD_upper,
+		Floor([Entry_SD]*10)/10 as Entry_SD_lower
 	from #tmp14)
 
 Select DR_date,
@@ -2730,7 +2732,7 @@ Select DR_date,
             when 'Sat' then 6
             when 'Sun' then 7
     end as DoW,
-    [session],Conf_Direction,[Entry_SD],
+    [session],Conf_Direction,concat(format(Entry_SD_lower,'0.00'),'  to ',format(Entry_SD_upper,'0.00')) as [Entry_SD_Range], [Entry_SD],
     convert(VARCHAR(5),cast(FirstEntryTime as Time),108) as [FirstEntryTime],
     convert(VARCHAR(5),cast(Stop_Out_Time as Time),108) as [Stop_Out_Time],
     convert(VARCHAR(5),cast(TP_Reach_Time as Time),108) as [TP_Reach_Time],
