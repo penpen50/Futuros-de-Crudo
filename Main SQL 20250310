@@ -1217,6 +1217,10 @@ Select a.*,
 		when a.[Box Color] in ('Green') then convert(decimal(10,2),((a.[M7BoxClose]-b.RBC_M7Box_retracement)*-0.1/a.M7Box_SD_Size))
 		when a.[Box Color] in ('Red') then convert(decimal(10,2),((a.[M7BoxClose]-b.RBC_M7Box_retracement)*0.1/a.M7Box_SD_Size))
 	end as RBC_M7Box_retracement_SD,
+	case 
+		when a.[Box Color] in ('Green') then convert(decimal(10,2),((a.[IDR_high]-b.RBC_M7Box_retracement)*-0.1/a.M7Box_SD_Size))
+		when a.[Box Color] in ('Red') then convert(decimal(10,2),((a.[IDR_Low]-b.RBC_M7Box_retracement)*0.1/a.M7Box_SD_Size))
+	end as RBC_Retracement_SD,
 --Wick --6
 	case 
 		when a.[Box Color] in ('Green') and RBC_M7Box_retracement>=[M7BoxOpen] then 'RBC M7 Box not broken'
@@ -1321,6 +1325,10 @@ With InitialBuckets As( --16
 	Floor(Raw_Mid_SD*10)/10+0.1 as Raw_Mid_SD_upper,
 	Floor(Raw_Mid_SD*10)/10 as Raw_Mid_SD_lower,
 
+
+    Floor(RBC_Retracement_SD*10)/10+0.1 as RBC_Retracement_SD_upper,
+	Floor(RBC_Retracement_SD*10)/10 as RBC_Retracement_SD_lower,
+	
 	Floor(RBC_M7Box_retracement_SD*10)/10+0.1 as RBC_M7Box_retracement_SD_upper,
 	Floor(RBC_M7Box_retracement_SD*10)/10 as RBC_M7Box_retracement_SD_lower
 
@@ -1563,6 +1571,9 @@ Select
 	[RBC_M7Box_Retracement_SD],
 	concat(format(RBC_M7Box_Retracement_SD_lower,'0.00'),'  to ',format(RBC_M7Box_Retracement_SD_upper,'0.00')) as [RBC_M7Box_Retracement_SD_Range],
 
+	[RBC_Retracement_SD],
+	concat(format(RBC_Retracement_SD_lower,'0.00'),'  to ',format(RBC_Retracement_SD_upper,'0.00')) as [RBC_Retracement_SD_Range],
+ 
 	--15 --RBC study 
 	--Define 0%, 25%, 50%, 75% and 100% 
 	case 
