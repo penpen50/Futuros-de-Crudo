@@ -1,4 +1,5 @@
 Select top 10 * from  [dbo].[CL_5min_IndividualCon] order by TradingDatetime desc --='2008-08-31 16:10:00.0000000'
+--delete from  [dbo].[CL_5min_IndividualCon] where TradingDateTime='2025-03-31 18:00:00.0000000'
 
 --CREATE TABLE [dbo].[CL_Events] (
 --    DATE DATE,
@@ -2562,9 +2563,54 @@ Select a.*,[M7Box_Color_Close_SD] as [Entry_SD], --figure out the SD of M7Mid
 from #tmp7_SL a
         where [Session] in ('ADR','ODR','RDR') and DR_Box='Other' and [Box Color] in ('Red') 
 
+/************************************/
+--RBC backtest 5
+--It will be base on box color
+--Entry at Box close
+--SL M7 box Open line + 3 ticks
+
+-- Create the table with the necessary calculations
+drop table if exists #tmp7_SL
+Select a.*,a.[M7BoxOpen] as [StopPrice],a.[M7BoxClose] as [EntryPrice]
+into #tmp7_SL
+from #tmp7 a
+left join
+#DailyInfo06 b
+on a.DR_Date=b.DR_Date and a.[Session]=b.[Session]
+
+--Select top 10* from #tmp7
+
+Declare @SD_Target decimal(4,2);
+Declare @plus_tick decimal(4,2);
+
+set @SD_Target=1.0;
+set @plus_tick=3;
+
+drop table if exists #tmp8_1
+Select a.*,[M7Box_Color_Close_SD] as [Entry_SD], --figure out the SD of M7Mid
+        [EntryPrice] as [Entry],
+        case when Timeonly in ('20:30:00','04:00:00','10:30:00') then 1 else 0 end as [Qualify_Entry_Time],
+        [StopPrice]-(0.01*@plus_tick) as [SL],
+        case when [Low] <=([StopPrice]-(0.01*@plus_tick)) then 1 else 0 end as [SL_hit],
+        [IDR_high]+(@SD_Target*10*SD_Size) as [TP],
+        case when [High]>=([IDR_high]+(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
+into #tmp8_1
+from #tmp7_SL a
+        where [Session] in ('ADR','ODR','RDR') and DR_Box='Other' and [Box Color] in ('Green') 
+union all 
+Select a.*,[M7Box_Color_Close_SD] as [Entry_SD], --figure out the SD of M7Mid
+        [EntryPrice] as [Entry],
+        case when Timeonly in ('20:30:00','04:00:00','10:30:00') then 1 else 0 end as [Qualify_Entry_Time],
+        [StopPrice]+(0.01*@plus_tick) as [SL],
+        case when [High] >=[StopPrice]+(0.01*@plus_tick) then 1 else 0 end as [SL_hit],
+        [IDR_Low]-(@SD_Target*10*SD_Size) as [TP],
+        case when [Low]<=([IDR_Low]-(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
+from #tmp7_SL a
+        where [Session] in ('ADR','ODR','RDR') and DR_Box='Other' and [Box Color] in ('Red') 
+
 
 /*****************************************/
---RBC Backtest 5
+--RBC Backtest 6
 --Backtest by Retirement setup
 --SL IDR low + 3 ticks
 --[Futures].[dbo].[RBCRetirement]
@@ -2810,19 +2856,19 @@ set @SD_SL = @InitialSD_SL;
 -- Create a temporary table to hold the results
 
    Select a.*, @Entry as [Entry_SD],
-            [SD0]+(@Entry*10* [SD_Size]) as [Entry],
-            case when [SD0]+(@Entry*10* [SD_Size]) between [Low] and [High] then 1 else 0 end as [Qualify_Entry_Time],
-            [SD0]+(@SD_SL*10* [SD_Size])-(0.01*@plus_tick) as [SL],
-            case when [Low]<=([SD0]+(@SD_SL*10* [SD_Size])-(0.01*@plus_tick)) then 1 else 0 end as [SL_hit],
-            [SD0]+(@SD_Target*10*SD_Size) as [TP],
-            case when [High]>=([SD0]+(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
+            [IDR_high]+(@Entry*10* [SD_Size]) as [Entry],
+            case when ([IDR_high] + (@Entry * 10 * [SD_Size]) between [Low] and [High]) and  T_DateTime <= [First_Conf_T_DateTime] then 1 else 0 end as [Qualify_Entry_Time],
+            [IDR_high]+(@SD_SL*10* [SD_Size])-(0.01*@plus_tick) as [SL],
+            case when [Low]<=([IDR_high]+(@SD_SL*10* [SD_Size])-(0.01*@plus_tick)) then 1 else 0 end as [SL_hit],
+            [IDR_high]+(@SD_Target*10*SD_Size) as [TP],
+            case when [High]>=([IDR_high]+(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
 	into #tmp8_1
         from #tmp7 a
         where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and T_DateTime<=[First_Conf_T_DateTime] and [Box Color] in ('Green')
         union all
     Select a.*,@Entry as [Entry_SD],
             [SD0] - (@Entry *10* [SD_Size]) as [Entry],
-            case when [SD0] - (@Entry * 10* [SD_Size]) between [Low] and [High] then 1 else 0 end as [Qualify_Entry_Time],
+            case when ([IDR_Low] - (@Entry * 10 * [SD_Size]) between [Low] and [High]) and  T_DateTime <= [First_Conf_T_DateTime]  then 1 else 0 end as [Qualify_Entry_Time],
             [SD0] - (@SD_SL*10* [SD_Size])+(0.01*@plus_tick) as [SL],
             case when [High]>=([SD0]-(@SD_SL*10* [SD_Size])+(0.01*@plus_tick)) then 1 else 0 end as [SL_hit],
             [SD0]-(@SD_Target*10*SD_Size) as [TP],
@@ -2838,23 +2884,23 @@ BEGIN
     -- Insert the results for the current entry value into the temporary table
     insert into #tmp8_1
     Select a.*,@Entry as [Entry_SD],
-            [SD0]+(@Entry*10* [SD_Size]) as [Entry],
-            case when [SD0]+(@Entry*10* [SD_Size]) between [Low] and [High] then 1 else 0 end as [Qualify_Entry_Time],
-            [SD0]+(@SD_SL*10* [SD_Size])-(0.01*@plus_tick) as [SL],
-            case when [Low]<=([SD0]+(@SD_SL*10* [SD_Size])-(0.01*@plus_tick)) then 1 else 0 end as [SL_hit],
-            [SD0]+(@SD_Target*10*SD_Size) as [TP],
-            case when [High]>=([SD0]+(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
+            [IDR_high]+(@Entry*10* [SD_Size]) as [Entry],
+            case when ([IDR_high] + (@Entry * 10 * [SD_Size]) between [Low] and [High]) and  T_DateTime <= [First_Conf_T_DateTime] then 1 else 0 end as [Qualify_Entry_Time],
+            [IDR_high]+(@SD_SL*10* [SD_Size])-(0.01*@plus_tick) as [SL],
+            case when [Low]<=([IDR_high]+(@SD_SL*10* [SD_Size])-(0.01*@plus_tick)) then 1 else 0 end as [SL_hit],
+            [IDR_high]+(@SD_Target*10*SD_Size) as [TP],
+            case when [High]>=([IDR_high]+(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
         from #tmp7 a
         where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and T_DateTime<=[First_Conf_T_DateTime] and [Box Color] in ('Green') and @Entry!=@InitialEntry
 
     insert into #tmp8_1
     Select a.*,@Entry as [Entry_SD],
-            [SD0] - (@Entry* 10* [SD_Size]) as [Entry],
-            case when [SD0] - (@Entry * 10* [SD_Size]) between [Low] and [High] then 1 else 0 end as [Qualify_Entry_Time],
-            [SD0] - (@SD_SL*10* [SD_Size])+(0.01*@plus_tick) as [SL],
-            case when [High]>=([SD0]-(@SD_SL*10* [SD_Size])+(0.01*@plus_tick)) then 1 else 0 end as [SL_hit],
-            [SD0]-(@SD_Target*10*SD_Size) as [TP],
-            case when [Low]<= ([SD0]-(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
+            [IDR_Low] - (@Entry* 10* [SD_Size]) as [Entry],
+            case when ([IDR_Low] - (@Entry * 10 * [SD_Size]) between [Low] and [High]) and  T_DateTime <= [First_Conf_T_DateTime]  then 1 else 0 end as [Qualify_Entry_Time],
+            [IDR_Low] - (@SD_SL*10* [SD_Size])+(0.01*@plus_tick) as [SL],
+            case when [High]>=([IDR_Low]-(@SD_SL*10* [SD_Size])+(0.01*@plus_tick)) then 1 else 0 end as [SL_hit],
+            [IDR_Low]-(@SD_Target*10*SD_Size) as [TP],
+            case when [Low]<= ([IDR_Low]-(@SD_Target*10*SD_Size)) then 1 else 0 end as [TP_hit]
         from #tmp7 a
         where [Session] in ('ADR','ODR','RDR') and DR_Box='Other'and T_DateTime<=[First_Conf_T_DateTime] and [Box Color] in ('Red') and @Entry!=@InitialEntry;
 
@@ -3087,12 +3133,13 @@ Select top 10 * from #tmp16
 --Above and below base on box color
 drop table if exists #tmp16
 Select a.*,b.[Conf_bucket],b.[M7BoxOpen],b.[M7BoxClose],b.[M7BoxSize_Range],
-	case when a.Conf_Direction='Green' and a.[Entry]<b.[M7BoxOpen] then 'Below M7Box'
-		when a.Conf_Direction='Green' and a.[Entry]>b.[M7BoxClose] then 'Above M7Box'
-		when a.Conf_Direction='Red' and a.[Entry]<b.[M7BoxClose] then 'Above M7Box'
-		when a.Conf_Direction='Short' and a.[Entry]>b.[M7BoxOpen] then 'Below M7Box'
-		when a.[Entry]<=b.[M7Box_Raw_top] and a.[Entry]>=b.[M7Box_raw_bottom] then 'Inside M7Box' --inclusive of open and close line
-	when a.Conf_Direction='No Conf' then 'No Conf'
+	case when a.[Box Color]='Green' and a.[Entry]<b.[M7BoxOpen] then 'Below M7Box'
+		when a.[Box Color]='Green' and a.[Entry]>b.[M7BoxClose] then 'Above M7Box'
+		when a.[Box Color]='Red' and a.[Entry]<b.[M7BoxClose] then 'Above M7Box'
+		when a.[Box Color]='Short' and a.[Entry]>b.[M7BoxOpen] then 'Below M7Box'
+		--when a.[Entry]<=b.[M7Box_Raw_top] and a.[Entry]>=b.[M7Box_raw_bottom] then 'Inside M7Box' --inclusive of open and close line
+		when a.[Box Color]='Grey' then 'No RBC entry'
+	else 'Inside M7Box'
 	end as [Entry relative to M7Box],
 	1 as [Count]
 into #tmp16
@@ -3213,13 +3260,18 @@ Select  * from #tmp16 where [Session]='RDR' order by DR_Date desc
 drop table if exists  [Futures].[dbo].[Retirement] 
 Select * into [Futures].[dbo].[Retirement] from #tmp16
 
-Select  * from #tmp16 where [Session]='RDR' order by DR_Date desc
+Select  * from #tmp16-- where [Session]='RDR' order by DR_Date desc
 drop table if exists  [Futures].[dbo].[RBCRetirement] 
 Select * into [Futures].[dbo].[RBCRetirement] from #tmp16
 
 drop table if exists  [Futures].[dbo].[RBC_0.5SL] 
 Select * into [Futures].[dbo].[RBC_0.5SL]  from #tmp16
 Select * from [Futures].[dbo].[RBC_0.5SL] 
+
+drop table if exists  [Futures].[dbo].[RBC_M7BoxOpenSL] 
+Select * into [Futures].[dbo].[RBC_M7BoxOpenSL]  from #tmp16
+Select * from [Futures].[dbo].[RBC_M7BoxOpenSL] 
+
 
 drop table if exists  [Futures].[dbo].[Entry0to-0.5_SL0.5] 
 Select * into [Futures].[dbo].[Entry0to-0.5_SL0.5]   from #tmp16
