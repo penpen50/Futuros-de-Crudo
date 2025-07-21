@@ -1903,14 +1903,15 @@ Select a.DR_Date,
 	a.[Session_High],
 	a.[Session_Low],
 	case  
-		when a.[Session_High]>b.[GreenMax] then 'Green Extreme'
-		when a.[Session_High]=b.[GreenMax] then 'Green Max'
-		when a.[Session_High]<b.[GreenMax] and a.[Session_High]>b.[GreenAvg] then 'Green Avg-Max'
+		when a.[Session_High]>b.[GreenMax]+0.01 then 'Green Extreme' --add 10 ticks as tolerance
+		when a.[Session_High]=b.[GreenMax]+0.01 then 'Green Max'
+		when a.[Session_High]<b.[GreenMax]+0.01 and a.[Session_High]>b.[GreenAvg] then 'Green Avg-Max'
 		when a.[Session_High]=b.[GreenAvg] then 'Green Avg'
-		when a.[Session_High]<b.[GreenAvg] and a.[Session_High]>b.[GreenMed] then 'Green Med-AVg'
+		when a.[Session_High]<b.[GreenAvg] and a.[Session_High]>b.[GreenMed] then 'Green Med-Avg'
 		when a.[Session_High]=b.[GreenMed] then 'Green Med'
 		when a.[Session_High]<b.[GreenMed] and a.[Session_High]> b.[GreenMin] then 'Green Min-Med'
 		when a.[Session_High]=b.[GreenMin] then 'Green Min'
+
 		when a.[Session_High]<b.[GreenMin] and a.[Session_High]>=b.[Mid_Min_Min] then 'Green Min'
 		when a.[Session_High]<b.[Mid_Min_Min] and a.[Session_High]>b.[RedMin] then 'Red Min'
 		when a.[Session_High]=b.[RedMin] then 'Red Min'
