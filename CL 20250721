@@ -1903,15 +1903,14 @@ Select a.DR_Date,
 	a.[Session_High],
 	a.[Session_Low],
 	case  
-		when a.[Session_High]>b.[GreenMax]+0.01 then 'Green Extreme' --add 10 ticks as tolerance
-		when a.[Session_High]=b.[GreenMax]+0.01 then 'Green Max'
-		when a.[Session_High]<b.[GreenMax]+0.01 and a.[Session_High]>b.[GreenAvg] then 'Green Avg-Max'
+		when a.[Session_High]>b.[GreenMax]+0.1 then 'Green Extreme'--Add 10 ticks tolerance
+		when a.[Session_High]<=b.[GreenMax]+0.1 and a.[Session_High]>=[GreenMax]  then 'Green Max'
+		when a.[Session_High]<b.[GreenMax] and a.[Session_High]>b.[GreenAvg] then 'Green Avg-Max'
 		when a.[Session_High]=b.[GreenAvg] then 'Green Avg'
 		when a.[Session_High]<b.[GreenAvg] and a.[Session_High]>b.[GreenMed] then 'Green Med-Avg'
 		when a.[Session_High]=b.[GreenMed] then 'Green Med'
 		when a.[Session_High]<b.[GreenMed] and a.[Session_High]> b.[GreenMin] then 'Green Min-Med'
 		when a.[Session_High]=b.[GreenMin] then 'Green Min'
-
 		when a.[Session_High]<b.[GreenMin] and a.[Session_High]>=b.[Mid_Min_Min] then 'Green Min'
 		when a.[Session_High]<b.[Mid_Min_Min] and a.[Session_High]>b.[RedMin] then 'Red Min'
 		when a.[Session_High]=b.[RedMin] then 'Red Min'
@@ -1920,12 +1919,12 @@ Select a.DR_Date,
 		when a.[Session_High]<b.[RedMed] and a.[Session_High]>b.[RedAvg] then 'Red Med-Avg'
 		when a.[Session_High]=b.[RedAvg] then 'Red Avg'
 		when a.[Session_High]<b.[RedAvg] and a.[Session_High]>b.[RedMax] then 'Red Avg-Max'
-		when a.[Session_High]=b.[RedMax] then 'Red Max'
-		when a.[Session_High]<b.[RedMax] then 'Red Extreme'
+		when a.[Session_High]<=b.[RedMax] and a.[Session_High]>=b.[RedMax]-0.1 then 'Red Max'
+		when a.[Session_High]<b.[RedMax]-0.1 then 'Red Extreme'
 	end as [Session_High_DDR_Pos],
 	case  
-		when a.[Session_Low]>b.[GreenMax] then 'Green Extreme'
-		when a.[Session_Low]=b.[GreenMax] then 'Green Max'
+		when a.[Session_Low]>b.[GreenMax]+0.1 then 'Green Extreme'--Add 10 ticks tolerance
+		when a.[Session_Low]<=b.[GreenMax]+0.1 and a.[Session_Low]>=[GreenMax]  then 'Green Max'
 		when a.[Session_Low]<b.[GreenMax] and a.[Session_Low]>b.[GreenAvg] then 'Green Avg-Max'
 		when a.[Session_Low]=b.[GreenAvg] then 'Green Avg'
 		when a.[Session_Low]<b.[GreenAvg] and a.[Session_Low]>b.[GreenMed] then 'Green Med-Avg'
@@ -1940,15 +1939,15 @@ Select a.DR_Date,
 		when a.[Session_Low]<b.[RedMed] and a.[Session_Low]>b.[RedAvg] then 'Red Med-Avg'
 		when a.[Session_Low]=b.[RedAvg] then 'Red Avg'
 		when a.[Session_Low]<b.[RedAvg] and a.[Session_Low]>b.[RedMax] then 'Red Avg-Max'
-		when a.[Session_Low]=b.[RedMax] then 'Red Max'
-		when a.[Session_Low]<b.[RedMax] then 'Red Extreme'
+		when a.[Session_Low]<=b.[RedMax] and a.[Session_Low]>=b.[RedMax]-0.1 then 'Red Max'
+		when a.[Session_Low]<b.[RedMax]-0.1 then 'Red Extreme'
 	end as [Session_Low_DDR_Pos],
 	case  	
-		when a.[M7BoxClose]>b.[GreenMax] then 'Green Extreme'
-		when a.[M7BoxClose]=b.[GreenMax] then 'Green Max'
+		when a.[M7BoxClose]>b.[GreenMax]+0.1 then 'Green Extreme'--Add 10 ticks tolerance
+		when a.[M7BoxClose]<=b.[GreenMax]+0.1 and a.[M7BoxClose]>=[GreenMax]  then 'Green Max'
 		when a.[M7BoxClose]<b.[GreenMax] and a.[M7BoxClose]>b.[GreenAvg] then 'Green Avg-Max'
 		when a.[M7BoxClose]=b.[GreenAvg] then 'Green Avg'
-		when a.[M7BoxClose]<b.[GreenAvg] and a.[M7BoxClose]>b.[GreenMed] then 'Green Med-AVg'
+		when a.[M7BoxClose]<b.[GreenAvg] and a.[M7BoxClose]>b.[GreenMed] then 'Green Med-Avg'
 		when a.[M7BoxClose]=b.[GreenMed] then 'Green Med'
 		when a.[M7BoxClose]<b.[GreenMed] and a.[M7BoxClose]> b.[GreenMin] then 'Green Min-Med'
 		when a.[M7BoxClose]=b.[GreenMin] then 'Green Min'
@@ -1960,8 +1959,8 @@ Select a.DR_Date,
 		when a.[M7BoxClose]<b.[RedMed] and a.[M7BoxClose]>b.[RedAvg] then 'Red Med-Avg'
 		when a.[M7BoxClose]=b.[RedAvg] then 'Red Avg'
 		when a.[M7BoxClose]<b.[RedAvg] and a.[M7BoxClose]>b.[RedMax] then 'Red Avg-Max'
-		when a.[M7BoxClose]=b.[RedMax] then 'Red Max'
-		when a.[M7BoxClose]<b.[RedMax] then 'Red Extreme'
+		when a.[M7BoxClose]<=b.[RedMax] and a.[M7BoxClose]>=b.[RedMax]-0.1 then 'Red Max'
+		when a.[M7BoxClose]<b.[RedMax]-0.1 then 'Red Extreme'
 	end as [M7BoxClose_DDR_Pos]
 	into #SessionDDR2 
 from #SessionDDR1  a
@@ -1969,7 +1968,7 @@ left join #CL_5min_DDR b
 on a.DR_Date = b.Date
 
 --Select * from [Futures].[dbo].[CL_5min_DDR] where [Date]='2023-03-13'
-
+Select [Session_Low_DDR_Pos] from #SessionDDR2 group by [Session_Low_DDR_Pos]
 -- Select * from #SessionDDR2 where ([Session_High_DDR_Pos] is NULL or [Session_Low_DDR_Pos] is NULL)
 --  and Session in ('ADR','ODR','RDR') order by DR_date desc
 
@@ -2004,9 +2003,84 @@ from #SessionDDR2
 	[WeekDayname],
 	[Weekday]
 
+--Create sort table
+-- CREATE TABLE #DDR_Pos_Sort (
+--     DDR_Pos NVARCHAR(100),
+--     Sort_Order INT
+-- );
+
+-- INSERT INTO #DDR_Pos_Sort VALUES ('Green Extreme', 1);
+-- INSERT INTO #DDR_Pos_Sort VALUES ('Green Max', 2);
+-- INSERT INTO #DDR_Pos_Sort VALUES ('Green Avg-Max', 3);
+-- INSERT INTO #DDR_Pos_Sort VALUES ('Green Avg', 4);
+-- INSERT INTO #DDR_Pos_Sort VALUES ('Green Med-Avg', 5);
+-- INSERT INTO #DDR_Pos_Sort VALUES ('Green Med', 6);
+-- INSERT INTO #DDR_Pos_Sort VALUES ('Green Min-Med', 7);
+-- INSERT INTO #DDR_Pos_Sort VALUES ('Green Min', 8);
+-- INSERT INTO #DDR_Pos_Sort VALUES ('Min-Min', 9);
+-- INSERT INTO #DDR_Pos_Sort VALUES ('Red Min', 10);
+-- INSERT INTO #DDR_Pos_Sort VALUES ('Red Min-Med', 11);
+-- INSERT INTO #DDR_Pos_Sort VALUES ('Red Med', 12);
+-- INSERT INTO #DDR_Pos_Sort VALUES ('Red Med-Avg', 13);
+-- INSERT INTO #DDR_Pos_Sort VALUES ('Red Avg', 14);
+-- INSERT INTO #DDR_Pos_Sort VALUES ('Red Avg-Max', 15);
+-- INSERT INTO #DDR_Pos_Sort VALUES ('Red Max', 16);
+-- INSERT INTO #DDR_Pos_Sort VALUES ('Red Extreme', 17);
+-- INSERT INTO #DDR_Pos_Sort VALUES ('NULL', 18);
+
+--Add columns for sorting
+
+SELECT 
+    d.*,
+
+    -- High DDR Sorts
+    s1.Sort_Order AS ADR_HighDDR_Sort,
+    s2.Sort_Order AS ADR_ODR_HighDDR_Sort,
+    s3.Sort_Order AS ODR_HighDDR_Sort,
+    s4.Sort_Order AS ODR_RDR_HighDDR_Sort,
+    s5.Sort_Order AS RDR_HighDDR_Sort,
+    s6.Sort_Order AS RDR_ADR_HighDDR_Sort,
+
+    -- Low DDR Sorts
+    s7.Sort_Order AS ADR_LowDDR_Sort,
+    s8.Sort_Order AS ADR_ODR_LowDDR_Sort,
+    s9.Sort_Order AS ODR_LowDDR_Sort,
+    s10.Sort_Order AS ODR_RDR_LowDDR_Sort,
+    s11.Sort_Order AS RDR_LowDDR_Sort,
+    s12.Sort_Order AS RDR_ADR_LowDDR_Sort,
+
+    -- Close DDR Sorts
+    s13.Sort_Order AS ADR_CloseDDR_Sort,
+    s14.Sort_Order AS ODR_CloseDDR_Sort,
+    s15.Sort_Order AS RDR_CloseDDR_Sort
+
+INTO #SessionDDR4
+FROM #SessionDDR3 d
+
+-- High DDR Joins
+LEFT JOIN #DDR_Pos_Sort s1 ON d.ADR_High_DDR_Pos = s1.DDR_Pos
+LEFT JOIN #DDR_Pos_Sort s2 ON d.ADR_ODR_High_DDR_Pos = s2.DDR_Pos
+LEFT JOIN #DDR_Pos_Sort s3 ON d.ODR_High_DDR_Pos = s3.DDR_Pos
+LEFT JOIN #DDR_Pos_Sort s4 ON d.ODR_RDR_High_DDR_Pos = s4.DDR_Pos
+LEFT JOIN #DDR_Pos_Sort s5 ON d.RDR_High_DDR_Pos = s5.DDR_Pos
+LEFT JOIN #DDR_Pos_Sort s6 ON d.RDR_ADR_High_DDR_Pos = s6.DDR_Pos
+
+-- Low DDR Joins
+LEFT JOIN #DDR_Pos_Sort s7 ON d.ADR_Low_DDR_Pos = s7.DDR_Pos
+LEFT JOIN #DDR_Pos_Sort s8 ON d.ADR_ODR_Low_DDR_Pos = s8.DDR_Pos
+LEFT JOIN #DDR_Pos_Sort s9 ON d.ODR_Low_DDR_Pos = s9.DDR_Pos
+LEFT JOIN #DDR_Pos_Sort s10 ON d.ODR_RDR_Low_DDR_Pos = s10.DDR_Pos
+LEFT JOIN #DDR_Pos_Sort s11 ON d.RDR_Low_DDR_Pos = s11.DDR_Pos
+LEFT JOIN #DDR_Pos_Sort s12 ON d.RDR_ADR_Low_DDR_Pos = s12.DDR_Pos
+
+-- Close DDR Joins
+LEFT JOIN #DDR_Pos_Sort s13 ON d.ADR_Close_DDR_Pos = s13.DDR_Pos
+LEFT JOIN #DDR_Pos_Sort s14 ON d.ODR_Close_DDR_Pos = s14.DDR_Pos
+LEFT JOIN #DDR_Pos_Sort s15 ON d.RDR_Close_DDR_Pos = s15.DDR_Pos
+
 drop table if exists [Futures].[dbo].[DDRseq]
-Select * into [Futures].[dbo].[DDRseq] from #SessionDDR3 
-Select * from #SessionDDR3 order by DR_Date
+Select * into [Futures].[dbo].[DDRseq] from #SessionDDR4
+Select * from #SessionDDR4 order by DR_Date
 
 /**************************************************************/
 /*******************Weekly Model ***************/
