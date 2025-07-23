@@ -2003,7 +2003,7 @@ from #SessionDDR2
 	[WeekDayname],
 	[Weekday]
 
---Create sort table
+-- Create sort table
 -- CREATE TABLE #DDR_Pos_Sort (
 --     DDR_Pos NVARCHAR(100),
 --     Sort_Order INT
@@ -2186,20 +2186,54 @@ Select [WDRRday],[Dateonly] from #Weekly2 where [WDRRday]='D1' group by [Dateonl
 -- Select top 10 * from #Weekly3
 
 /*Find max and min for each one of the WDRR day*/
-drop table if exists #Weekly4
-Select 
-    [WDRR_startday],
-    [WDRRday],	
-	max([High]) as WDRRday_high,
-	min([Low]) as WDRRday_low
+drop table if exists #Weekly4;
+-- Select 
+--     [WDRR_startday],
+--     [WDRRday],	
+-- 	max([High]) as WDRRday_high,
+-- 	min([Low]) as WDRRday_low
 		
-into #Weekly4
-from #Weekly3
-group by 
-    [WDRR_startday],
-    [WDRRday]
+-- into #Weekly4
+-- from #Weekly3
+-- group by 
+--     [WDRR_startday],
+--     [WDRRday]
+drop table if exists #Weekly4;
+
+WITH RankedTimes AS (
+    SELECT
+        [WDRR_startday],
+        [WDRRday],
+        [High],
+        [Low],
+        [T_DateTime],
+        ROW_NUMBER() OVER(PARTITION BY [WDRR_startday], [WDRRday] ORDER BY [High] DESC, [T_DateTime] ASC) as rn_high,
+        ROW_NUMBER() OVER(PARTITION BY [WDRR_startday], [WDRRday] ORDER BY [Low] ASC, [T_DateTime] ASC) as rn_low
+    FROM 
+        #Weekly3
+)
+SELECT 
+    r_high.[WDRR_startday],
+    r_high.[WDRRday],
+    r_high.[High] as WDRRday_high,
+    r_high.[T_DateTime] as WDRRday_high_time,
+    CONVERT(varchar(5), r_high.[T_DateTime], 108) as WDRRday_high_time_hhmm,
+    r_low.[Low] as WDRRday_low,
+    r_low.[T_DateTime] as WDRRday_low_time,
+    CONVERT(varchar(5), r_low.[T_DateTime], 108) as WDRRday_low_time_hhmm
+INTO #Weekly4
+FROM 
+    (SELECT * FROM RankedTimes WHERE rn_high = 1) as r_high
+JOIN 
+    (SELECT * FROM RankedTimes WHERE rn_low = 1) as r_low
+ON 
+    r_high.[WDRR_startday] = r_low.[WDRR_startday] AND r_high.[WDRRday] = r_low.[WDRRday];
 
 Select top 100 * from #Weekly4 order by WDRR_startday desc,  [WDRRday]asc;
+
+drop table if exists [Futures].[dbo].[CL_WDRRHLhours] 
+Select * into [Futures].[dbo].[CL_WDRRHLhours] from #Weekly4
+
 
 /*Figure out which dates have the high and low*/
 
